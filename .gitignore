@@ -1,0 +1,30 @@
+# Local accounts, sessions, screenshots, logs and scan results
+/data/
+/config.json
+/desktop-runtime.json
+*.dpapi
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+.env
+.env.*
+*.pem
+*.key
+
+# Python environments and generated files
+/.venv/
+/venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Desktop build and verification output
+**/bin/
+**/obj/
+**/publish/
+**/ui-review/
+ui-error.txt
+.vs/
+*.user
+*.suo

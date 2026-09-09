@@ -1,0 +1,7 @@
+# EOG icon
+
+Generated with the built-in image-generation tool. The original transparent PNG is preserved as `eog-geass.png`. `eog-geass.ico` packages the same artwork at Windows icon sizes: 16, 24, 32, 48, 64, 128, and 256 pixels.
+
+## Final generation prompt
+
+Use case: logo-brand. Asset: a polished Windows desktop application icon for EOG (Eye of God), square 1024x1024 PNG with genuine transparent background outside the emblem. User request: specifically Lelouch's Geass anime pupil from Code Geass, inside a darker red circle with a black outline. Create a single centered circular iris emblem: dark crimson / oxblood red iris disk, thick crisp black outer outline, and the instantly recognizable sharp winged bird-shaped Geass sigil from Lelouch's activated eye in brighter saturated scarlet red at the center. Faithful angular Geass symbol silhouette, symmetrical outstretched tapered wings and downward central pointed form; anime eye / pupil emblem rather than a whole face or an almond-shaped eye. A restrained subtle inner red glow gives depth, but strong clean graphic shapes remain legible as a 32px app icon. Emblem occupies about 90% of square with equal transparent margins. Flat front-on view, bold graphic rendering, sharp smooth edges, limited dark-red, bright-red, and black palette. No text, no letters, no watermark, no decorative frame beyond the black circular outline, no background shadow or scenery. Keep the circle dark red, not orange or pink.
