@@ -64,7 +64,7 @@ class BridgeTests(unittest.TestCase):
     def test_invalid_apply_does_not_stop_current_scan(self):
         with patch.object(self.bridge,'stop') as stop:
             with self.assertRaises(ValueError):
-                self.bridge.dispatch({'command':'apply','workerCount':7,'accounts':[]})
+                self.bridge.dispatch({'command':'apply','workerCount':11,'accounts':[]})
             stop.assert_not_called()
 
     def test_restart_request_targets_one_agent(self):

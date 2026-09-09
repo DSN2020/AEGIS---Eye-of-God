@@ -14,6 +14,7 @@ namespace EternalVoidPanel;
 
 public partial class MainWindow : Window
 {
+    private const int MaxAgents = 10;
     private Process? bridge;
     private readonly SemaphoreSlim bridgeLock = new(1,1);
     private readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromSeconds(2) };
@@ -134,7 +135,7 @@ public partial class MainWindow : Window
 
     private string AccountColor(string account) {
         if(accountColors.TryGetValue(account,out var color)) return color;
-        string[] palette=["#80CFFF","#BEA0FF","#F2C66D","#6EDCB5","#FF927C","#F299CE"];
+        string[] palette=["#80CFFF","#BEA0FF","#F2C66D","#6EDCB5","#FF927C","#F299CE","#B8DD72","#70DFE8","#F6AD62","#ABB8FF"];
         return accountColors[account]=palette[accountColors.Count%palette.Length];
     }
     private void UpdateActivity(JsonElement entries,TimeSpan now) {
@@ -167,7 +168,7 @@ public partial class MainWindow : Window
 
     private void BuildAccountRows()
     {
-        for(int index=0;index<6;index++) {
+        for(int index=0;index<MaxAgents;index++) {
             var grid=new Grid(); grid.ColumnDefinitions.Add(new(){Width=new GridLength(90)}); grid.ColumnDefinitions.Add(new()); grid.ColumnDefinitions.Add(new()); grid.ColumnDefinitions.Add(new(){Width=new GridLength(140)});
             var label=new TextBlock {Text=$"Agent {index+1}",VerticalAlignment=VerticalAlignment.Center,FontSize=12}; slotLabels.Add(label); grid.Children.Add(label);
             var name=new TextBox {Margin=new Thickness(0,0,12,0),Height=40,ToolTip=$"Username for agent {index+1}"}; Grid.SetColumn(name,1); grid.Children.Add(name); usernames.Add(name);
@@ -184,15 +185,15 @@ public partial class MainWindow : Window
         savedWorkerCount=workerCount;
         var accounts=settings.GetProperty("accounts").EnumerateArray().ToArray();
         savedNames.Clear(); foreach(var a in accounts) if(B(a,"hasPassword")) savedNames.Add(S(a,"username"));
-        for(int i=0;i<6;i++) {
+        for(int i=0;i<MaxAgents;i++) {
             usernames[i].Text=i<accounts.Length ? S(accounts[i],"username") : ""; passwords[i].Clear();
             credentialLabels[i].Text=i<accounts.Length && B(accounts[i],"hasPassword") ? "Saved securely" : "Not saved";
         }
         UpdateCount();
     }
-    private void UpdateCount() { AgentCount.Text=workerCount.ToString(); for(int i=0;i<6;i++) {slotLabels[i].Text=$"Agent {i+1}\n"+(i<workerCount ? "Selected slot" : "Standby"); slotLabels[i].Foreground=(Brush)FindResource(i<workerCount ? "TextBrush" : "GrayBrush");} }
+    private void UpdateCount() { AgentCount.Text=workerCount.ToString(); for(int i=0;i<MaxAgents;i++) {slotLabels[i].Text=$"Agent {i+1}\n"+(i<workerCount ? "Selected slot" : "Standby"); slotLabels[i].Foreground=(Brush)FindResource(i<workerCount ? "TextBrush" : "GrayBrush");} }
     private void ChangeWorkerCount(int delta) {
-        int next=Math.Clamp(workerCount+delta,1,6);
+        int next=Math.Clamp(workerCount+delta,1,MaxAgents);
         if(next==workerCount) return;
         workerCount=next; UpdateCount();
         if(verifyUi) return; // UI verification never changes scanner settings.
@@ -284,8 +285,8 @@ public partial class MainWindow : Window
     {
         string output=Path.Combine(root,"DesktopApp","ui-review"); Directory.CreateDirectory(output);
         LoadSettings(JsonSerializer.SerializeToElement(new {workerCount=1,accounts=Array.Empty<object>()}));
-        if(usernames.Count!=6 || passwords.Count!=6 || usernames.Any(x=>x.Text.Length!=0) || passwords.Any(x=>x.Password.Length!=0) || savedNames.Count!=0)
-            throw new Exception("Fresh installation must have six blank account slots");
+        if(usernames.Count!=MaxAgents || passwords.Count!=MaxAgents || usernames.Any(x=>x.Text.Length!=0) || passwords.Any(x=>x.Password.Length!=0) || savedNames.Count!=0)
+            throw new Exception("Fresh installation must have ten blank account slots");
         LoadSettings(await Request(new {command="settings"}));
         PlayerSearch.Text="nazim";
         if(!filteredPlayers.Any(p=>p.Coordinates.Contains("9:57:14"))) throw new InvalidOperationException("Known-player search regression failed.");
@@ -299,8 +300,16 @@ public partial class MainWindow : Window
             PlayerSearch.Clear(); AllianceSearch.Clear();
         }
         workerCount=1;LessAgents(this,new());if(workerCount!=1)throw new Exception("Agent minimum failed");
-        workerCount=6;MoreAgents(this,new());if(workerCount!=6)throw new Exception("Agent maximum failed");
+        workerCount=MaxAgents;MoreAgents(this,new());if(workerCount!=MaxAgents)throw new Exception("Agent maximum failed");
         if(countTimer.IsEnabled) throw new Exception("UI verification must not send count changes");
+        LoadSettings(await Request(new {command="settings"}));
+        var tenAccounts=Enumerable.Range(1,MaxAgents).Select(i=>new {username=$"Example account {i}",hasPassword=false}).ToArray();
+        LoadSettings(JsonSerializer.SerializeToElement(new {workerCount=MaxAgents,accounts=tenAccounts}));
+        var tenRequest=JsonSerializer.SerializeToElement(AccountRequest());
+        if(tenRequest.GetProperty("accounts").GetArrayLength()!=MaxAgents || S(tenRequest.GetProperty("accounts")[9],"username")!="Example account 10") throw new Exception("Tenth account was not included in save request");
+        accountColors.Clear();
+        if(tenAccounts.Select(a=>AccountColor(a.username)).Distinct().Count()!=MaxAgents) throw new Exception("Ten distinct account colors required");
+        accountColors.Clear();
         LoadSettings(await Request(new {command="settings"}));
         var realActivity=(await Request(new {command="snapshot"})).GetProperty("activity");
         double current=DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()/1000.0;
@@ -332,7 +341,14 @@ public partial class MainWindow : Window
             var bitmap=new RenderTargetBitmap((int)ActualWidth,(int)ActualHeight,96,96,PixelFormats.Pbgra32);bitmap.Render(this);
             var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(bitmap));using var file=File.Create(Path.Combine(output,item.Item2+".png"));encoder.Save(file);
         }
-        await File.WriteAllTextAsync(Path.Combine(output,"verification.json"),JsonSerializer.Serialize(new {passed=true,blankAccountSlots=true,search=true,allianceFilter=true,agentBounds=true,activityChronology=true,accountColors=true,fiveSecondExpiry=true,noRepeatFlash=true,playerRecency=true,players=allPlayers.Count,workers=workers.Count}));
+        ShowPage(NavAccounts); AccountsView.ScrollToEnd();
+        await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle); UpdateLayout();
+        var lastFieldPosition=usernames[^1].TransformToAncestor(this).Transform(new Point(0,0));
+        if(lastFieldPosition.Y<0 || lastFieldPosition.Y+usernames[^1].ActualHeight>ActualHeight) throw new Exception("Tenth account field cannot be reached");
+        var bottomBitmap=new RenderTargetBitmap((int)ActualWidth,(int)ActualHeight,96,96,PixelFormats.Pbgra32);bottomBitmap.Render(this);
+        var bottomEncoder=new PngBitmapEncoder();bottomEncoder.Frames.Add(BitmapFrame.Create(bottomBitmap));
+        using(var bottomFile=File.Create(Path.Combine(output,"accounts-bottom.png"))) bottomEncoder.Save(bottomFile);
+        await File.WriteAllTextAsync(Path.Combine(output,"verification.json"),JsonSerializer.Serialize(new {passed=true,blankAccountSlots=true,accountSlots=MaxAgents,tenAccountRequest=true,tenAccountColors=true,search=true,allianceFilter=true,agentBounds=true,activityChronology=true,accountColors=true,fiveSecondExpiry=true,noRepeatFlash=true,playerRecency=true,players=allPlayers.Count,workers=workers.Count}));
     }
 }
 

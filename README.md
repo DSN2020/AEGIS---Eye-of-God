@@ -12,7 +12,7 @@ Repository: [DSN2020/AEGIS---Eye-of-God](https://github.com/DSN2020/AEGIS---Eye-
 - Resumable coverage of nine galaxies, 499 systems each, and 21 slots per system. Unresolved slots remain queued for retry.
 - Player coordinates grouped by owner, newest observations first, with name search and alliance filtering.
 - Newest-first activity, distinct account colors, and five-second highlights for incoming messages.
-- Automatic resizing between 1–6 agents using saved accounts. Unchanged workers keep their browser processes.
+- Automatic resizing between 1–10 agents using saved accounts. Unchanged workers keep their browser processes.
 - Reads displayed planet-detail text directly from the game renderer, with automatic OCR fallback. Every planet is still opened and confirmed.
 - Local Windows DPAPI protection for saved passwords.
 
@@ -53,6 +53,8 @@ dotnet build DesktopApp/EyeOfGod.csproj -c Release
 
 The optional `EOG.exe --verify-ui` check requires populated local reference observations. It does not start or stop workers.
 
-Fresh installations have six blank username/password slots. Add your own accounts in Manage; there are no bundled accounts. Saved account names, encrypted passwords, browser sessions, and scan results stay in the local ignored files. Share this repository or a clean build, not your working folder with its local configuration and data.
+Fresh installations have ten blank username/password slots. Add your own accounts in Manage; there are no bundled accounts. Saved account names, encrypted passwords, browser sessions, and scan results stay in the local ignored files. Share this repository or a clean build, not your working folder with its local configuration and data.
 
 The `sweep.rendered_text` setting enables the faster detail reader (enabled in new configurations). Existing configurations can set it to `true` and restart workers individually; setting it to `false` restores OCR-only detail verification. Each account retains its isolated browser and saved login. Live previews and checkpoints continue working. Run `python verify_rendered_text.py` for offline browser checks; `python benchmark_efficiency.py rendered-text --account YOUR_ACCOUNT` benchmarks an explicitly selected idle account.
+
+EOG supports ten account slots. The current scheduler assigns a whole galaxy to each scanning agent, so up to nine can scan concurrently; an additional configured agent waits for an available assignment. New slots are blank and require your own credentials. Adding accounts through Save & apply restarts the supervisor from checkpoints and loads the updated limit.

@@ -8,6 +8,7 @@ import sys
 import time
 from datetime import datetime
 from pathlib import Path
+from ev_assistant.limits import MAX_AGENTS
 from ev_assistant.store import Store
 from ev_assistant.credentials import load_passwords, save_passwords
 from isolated_supervisor import atomic_json
@@ -88,9 +89,9 @@ class ApplicationBridge:
     def validate_settings(self, request):
         count = request.get('workerCount')
         accounts = request.get('accounts',[])
-        if type(count) is not int or not 1 <= count <= 6:
-            raise ValueError('Choose between 1 and 6 agents.')
-        if not count <= len(accounts) <= 6:
+        if type(count) is not int or not 1 <= count <= MAX_AGENTS:
+            raise ValueError(f'Choose between 1 and {MAX_AGENTS} agents.')
+        if not count <= len(accounts) <= MAX_AGENTS:
             raise ValueError('Add one account for every active agent.')
         names = [str(a.get('username','')).strip() for a in accounts]
         if any(not name for name in names[:count]):

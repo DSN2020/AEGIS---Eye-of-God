@@ -10,6 +10,7 @@ import sys
 import time
 from datetime import datetime
 from pathlib import Path
+from ev_assistant.limits import MAX_AGENTS
 from ev_assistant.store import Store
 from ev_assistant.__main__ import export_players
 
@@ -235,7 +236,7 @@ def reconcile_slots(slots, pending, config, data=DATA):
     """Resize the worker pool without restarting unaffected browser sessions."""
     count = config['sweep']['workers']
     names = config['sweep']['account_profiles']
-    if type(count) is not int or not 1 <= count <= 6 or len(names) < count:
+    if type(count) is not int or not 1 <= count <= MAX_AGENTS or len(names) < count:
         raise ValueError('Invalid worker count or missing accounts')
     if any(not name.strip() for name in names[:count]) or len({n.casefold() for n in names[:count]}) != count:
         raise ValueError('Active accounts must be unique and nonempty')

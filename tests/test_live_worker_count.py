@@ -73,3 +73,49 @@ class ResizeTests(unittest.TestCase):
         self.assertEqual(status['requestedWorkers'],3)
         self.assertEqual(status['activeWorkers'],2)
         self.assertTrue(status['workerCountPending'])
+
+    def test_ten_slots_are_accepted_and_existing_workers_preserved(self):
+        original=list(self.slots)
+        config={'sweep':{'workers':10,'account_profiles':['one','two']+[f'example{i}' for i in range(3,11)]}}
+        pending=list(range(3,10))
+        reconcile_slots(self.slots,pending,config,self.data)
+        self.assertEqual(len(self.slots),10)
+        self.assertEqual(self.slots[:2],original)
+        self.assertEqual(self.slots[-1].account,'example10')
+        for slot in original: slot.close.assert_not_called()
+        for slot in self.slots[2:]:
+            slot.next_launch=0;slot.start=Mock()
+            slot.service(pending,499)
+        self.assertEqual([slot.galaxy for slot in self.slots[:9]],list(range(1,10)))
+        self.assertIsNone(self.slots[9].galaxy)
+        self.slots[9].start.assert_not_called()
+        self.assertEqual(pending,[])
+
+    def test_eleven_slots_rejected_before_existing_workers_are_touched(self):
+        config={'sweep':{'workers':11,'account_profiles':[f'example{i}' for i in range(11)]}}
+        with self.assertRaises(ValueError): reconcile_slots(self.slots,[3],config,self.data)
+        self.assertEqual(len(self.slots),2)
+        for slot in self.slots: slot.close.assert_not_called()
+
+    def test_bridge_accepts_ten_saved_accounts_and_rejects_eleven(self):
+        config={'sweep':{'workers':6,'account_profiles':[f'example{i}' for i in range(10)]}}
+        (self.data/'config.json').write_text(json.dumps(config))
+        bridge=ApplicationBridge(self.data)
+        with patch('app_bridge.load_passwords',return_value=['test']),patch.object(bridge,'running',return_value=True),patch.object(bridge,'stop') as stop:
+            bridge.dispatch({'command':'set_worker_count','workerCount':10})
+            with self.assertRaises(ValueError): bridge.dispatch({'command':'set_worker_count','workerCount':11})
+            with self.assertRaises(ValueError): bridge.validate_settings({'workerCount':1,'accounts':[{'username':f'example{i}'} for i in range(11)]})
+            stop.assert_not_called()
+        self.assertEqual(json.loads((self.data/'config.json').read_text())['sweep']['workers'],10)
+
+    def test_adding_accounts_reloads_supervisor_with_new_limit(self):
+        (self.data/'config.json').write_text(json.dumps(self.config))
+        bridge=ApplicationBridge(self.data)
+        request={'command':'apply','workerCount':10,'accounts':[{'username':f'example{i}','password':'test'} for i in range(10)]}
+        with patch('app_bridge.load_passwords',return_value=['test']),patch('app_bridge.save_passwords'),patch.object(bridge,'running',return_value=True),patch.object(bridge,'stop') as stop,patch.object(bridge,'start') as start:
+            bridge.dispatch(request)
+            stop.assert_called_once();start.assert_called_once()
+        config=json.loads((self.data/'config.json').read_text())
+        self.assertEqual(config['sweep']['workers'],10)
+        self.assertEqual(config['sweep']['account_profiles'][-1],'example9')
+        self.assertEqual(len(config['sweep']['account_profiles']),10)
