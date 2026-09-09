@@ -11,7 +11,7 @@ Repository: [DSN2020/AEGIS---Eye-of-God](https://github.com/DSN2020/AEGIS---Eye-
 - RapidOCR reads the canvas. Every unverified slot is opened and checked before recording ownership.
 - Resumable coverage of nine galaxies, 499 systems each, and 21 slots per system. Unresolved slots remain queued for retry.
 - Player coordinates grouped by owner, newest observations first, with name search and alliance filtering.
-- Newest-first activity, distinct account colors, and five-second highlights for incoming messages.
+- Newest-first activity, distinct account colors, and one-second fades from account colors to gray for incoming messages.
 - Automatic resizing between 1–10 agents using saved accounts. Unchanged workers keep their browser processes.
 - Reads displayed planet-detail text directly from the game renderer, with automatic OCR fallback. Every planet is still opened and confirmed.
 - Local Windows DPAPI protection for saved passwords.

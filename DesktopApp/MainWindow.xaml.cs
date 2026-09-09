@@ -18,7 +18,7 @@ public partial class MainWindow : Window
     private Process? bridge;
     private readonly SemaphoreSlim bridgeLock = new(1,1);
     private readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromSeconds(2) };
-    private readonly DispatcherTimer highlightTimer = new() { Interval = TimeSpan.FromMilliseconds(100) };
+    private readonly DispatcherTimer highlightTimer = new() { Interval = TimeSpan.FromMilliseconds(50) };
     private readonly DispatcherTimer countTimer = new() { Interval = TimeSpan.FromMilliseconds(650) };
     private readonly Stopwatch activityClock = Stopwatch.StartNew();
     private readonly ObservableCollection<ActivityEntry> activityRows = [];
@@ -151,19 +151,19 @@ public partial class MainWindow : Window
             }
             bool firstTime=seenActivity.Add(id);
             if(firstTime) activityHistory.Enqueue(id);
-            // Don't flash historical logs on startup. New arrivals get five
-            // seconds from receipt, independently of the polling connection.
-            bool fresh=firstTime && (activityLoaded || DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()/1000.0-D(e,"timestamp") is >=0 and <=5);
+            // Don't flash historical logs on startup. New arrivals fade for one
+            // second from receipt, independently of the polling connection.
+            bool fresh=firstTime && (activityLoaded || DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()/1000.0-D(e,"timestamp") is >=0 and <=1);
             activityRows.Insert(i,new ActivityEntry {Id=id,Account=S(e,"account"),Text=S(e,"text"),
                 Timestamp=D(e,"timestamp"),AccountColor=AccountColor(S(e,"account")),
-                HighlightUntil=now+TimeSpan.FromSeconds(5),Highlighted=fresh});
+                HighlightUntil=now+ActivityEntry.HighlightDuration,Highlighted=fresh});
         }
         while(activityHistory.Count>4096) seenActivity.Remove(activityHistory.Dequeue());
         activityLoaded=true;
         ExpireActivityHighlights(now);
     }
     private void ExpireActivityHighlights(TimeSpan now) {
-        foreach(var row in activityRows) if(row.Highlighted && now>=row.HighlightUntil) row.Highlighted=false;
+        foreach(var row in activityRows) row.UpdateHighlight(now);
     }
 
     private void BuildAccountRows()
@@ -323,15 +323,23 @@ public partial class MainWindow : Window
         if(activityRows[0].Id!="verify-newest" || activityRows[^1].Id!="verify-older") throw new Exception("Activity chronology failed");
         if(activityRows.Select(r=>r.AccountColor).Distinct().Count()!=3 || activityRows.Any(r=>!r.Highlighted)) throw new Exception("Account highlighting failed");
         var firstRow=activityRows[0];
-        UpdateActivity(fixture,received+TimeSpan.FromSeconds(4));
-        if(!ReferenceEquals(firstRow,activityRows[0]) || firstRow.HighlightUntil!=received+TimeSpan.FromSeconds(5)) throw new Exception("Polling reset the highlight lifetime");
+        string initialForeground=firstRow.HighlightForeground.ToString();
+        UpdateActivity(fixture,received+TimeSpan.FromMilliseconds(400));
+        if(!ReferenceEquals(firstRow,activityRows[0]) || firstRow.HighlightUntil!=received+ActivityEntry.HighlightDuration) throw new Exception("Polling reset the highlight lifetime");
+        ExpireActivityHighlights(received+TimeSpan.FromMilliseconds(500));
+        if(!firstRow.Highlighted || firstRow.HighlightForeground.ToString()==initialForeground || firstRow.HighlightForeground.ToString()=="#FF9B9B9B") throw new Exception("Highlight did not interpolate toward gray");
         ShowPage(NavActivity); await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle); UpdateLayout();
         var highlightBitmap=new RenderTargetBitmap((int)ActualWidth,(int)ActualHeight,96,96,PixelFormats.Pbgra32); highlightBitmap.Render(this);
         var highlightEncoder=new PngBitmapEncoder();highlightEncoder.Frames.Add(BitmapFrame.Create(highlightBitmap));
         using(var highlightFile=File.Create(Path.Combine(output,"activity-highlights.png"))) highlightEncoder.Save(highlightFile);
         // Exercise the real UI timer without any further polling response.
-        await Task.Delay(5300);
-        if(activityRows.Any(r=>r.Highlighted)) throw new Exception("Highlights did not expire after five seconds");
+        await Task.Delay(1200);
+        if(activityRows.Any(r=>r.Highlighted)) throw new Exception("Highlights did not fade after one second");
+        if(activityRows.Any(r=>r.HighlightForeground.ToString()!="#FF9B9B9B" || r.HighlightBorder.ToString()!="#FF3B3B3B" || r.HighlightBackground.ToString()!="#FF202020")) throw new Exception("Expired highlights must remain gray");
+        await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle); UpdateLayout();
+        var fadedBitmap=new RenderTargetBitmap((int)ActualWidth,(int)ActualHeight,96,96,PixelFormats.Pbgra32);fadedBitmap.Render(this);
+        var fadedEncoder=new PngBitmapEncoder();fadedEncoder.Frames.Add(BitmapFrame.Create(fadedBitmap));
+        using(var fadedFile=File.Create(Path.Combine(output,"activity-faded.png"))) fadedEncoder.Save(fadedFile);
         UpdateActivity(fixture,activityClock.Elapsed);
         if(activityRows.Any(r=>r.Highlighted)) throw new Exception("Old messages flashed again on refresh");
         UpdateActivity(realActivity,activityClock.Elapsed);
@@ -348,7 +356,7 @@ public partial class MainWindow : Window
         var bottomBitmap=new RenderTargetBitmap((int)ActualWidth,(int)ActualHeight,96,96,PixelFormats.Pbgra32);bottomBitmap.Render(this);
         var bottomEncoder=new PngBitmapEncoder();bottomEncoder.Frames.Add(BitmapFrame.Create(bottomBitmap));
         using(var bottomFile=File.Create(Path.Combine(output,"accounts-bottom.png"))) bottomEncoder.Save(bottomFile);
-        await File.WriteAllTextAsync(Path.Combine(output,"verification.json"),JsonSerializer.Serialize(new {passed=true,blankAccountSlots=true,accountSlots=MaxAgents,tenAccountRequest=true,tenAccountColors=true,search=true,allianceFilter=true,agentBounds=true,activityChronology=true,accountColors=true,fiveSecondExpiry=true,noRepeatFlash=true,playerRecency=true,players=allPlayers.Count,workers=workers.Count}));
+        await File.WriteAllTextAsync(Path.Combine(output,"verification.json"),JsonSerializer.Serialize(new {passed=true,blankAccountSlots=true,accountSlots=MaxAgents,tenAccountRequest=true,tenAccountColors=true,search=true,allianceFilter=true,agentBounds=true,activityChronology=true,accountColors=true,oneSecondFade=true,grayAfterFade=true,noRepeatFlash=true,playerRecency=true,players=allPlayers.Count,workers=workers.Count}));
     }
 }
 

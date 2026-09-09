@@ -45,12 +45,12 @@
     </StackPanel></ScrollViewer>
     <Grid x:Name="ActivityView" Visibility="Collapsed">
      <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-     <StackPanel><TextBlock Text="Activity" Style="{StaticResource PageTitle}"/><TextBlock Text="Newest messages first. Each account has its own color; new messages are highlighted for five seconds." Style="{StaticResource MutedText}" Margin="0,0,0,18"/></StackPanel>
+     <StackPanel><TextBlock Text="Activity" Style="{StaticResource PageTitle}"/><TextBlock Text="Newest messages first. Each account has its own color; new messages fade to gray over one second." Style="{StaticResource MutedText}" Margin="0,0,0,18"/></StackPanel>
      <ListBox x:Name="ActivityList" Grid.Row="1" Background="#111111" BorderBrush="#2D2D2D" BorderThickness="1" Padding="8" ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Auto" VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling">
       <ListBox.ItemContainerStyle><Style TargetType="ListBoxItem"><Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="Padding" Value="0"/><Setter Property="Margin" Value="0,0,0,3"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ListBoxItem"><ContentPresenter/></ControlTemplate></Setter.Value></Setter></Style></ListBox.ItemContainerStyle>
       <ListBox.ItemTemplate><DataTemplate>
        <Border Background="{Binding HighlightBackground}" BorderBrush="{Binding HighlightBorder}" BorderThickness="3,0,0,0" CornerRadius="4" Padding="8,5">
-        <StackPanel><StackPanel Orientation="Horizontal"><TextBlock Text="{Binding Account}" Foreground="{Binding AccountColor}" FontWeight="SemiBold" FontSize="12" Margin="0,0,14,0"/><TextBlock Text="{Binding TimeLabel}" Foreground="#929292" FontFamily="Consolas" FontSize="11" VerticalAlignment="Center"/></StackPanel>
+        <StackPanel><StackPanel Orientation="Horizontal"><TextBlock Text="{Binding Account}" Foreground="{Binding HighlightForeground}" FontWeight="SemiBold" FontSize="12" Margin="0,0,14,0"/><TextBlock Text="{Binding TimeLabel}" Foreground="#929292" FontFamily="Consolas" FontSize="11" VerticalAlignment="Center"/></StackPanel>
          <TextBox Text="{Binding Text,Mode=OneWay}" IsReadOnly="True" Background="Transparent" Foreground="#DDDDDD" BorderThickness="0" Padding="0" Margin="0,3,0,0" FontFamily="Consolas" FontSize="11.5" TextWrapping="Wrap"/>
         </StackPanel>
        </Border>
