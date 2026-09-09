@@ -4,6 +4,7 @@ import logging
 import re
 import time
 from .store import Planet
+from .rendered_text import read_rendered_text
 from .vision import UncertainScreen, compact, join_rows
 
 REVISION = 'explicit-slots-v1'
@@ -26,10 +27,13 @@ def parse_slot(lines, expected, allow_nebula=False):
             and all(x in normalized for x in ('mysteriousnebula', 'safeexplorations',
                                                'navigationrelays', 'explore'))):
         return ('npc', None)
-    match = re.search(r'Coordinates\s*[:\uff1a]\s*(?:\[\s*)*(\d+)\s*[:\uff1a]\s*(\d+)\s*[:\uff1a]\s*(\d+)\s*\]?', text, re.I)
-    if not match or tuple(map(int, match.groups())) != tuple(expected):
+    matches = list(re.finditer(r'Coordinates\s*[:\uff1a]\s*(?:\[\s*)*(\d+)\s*[:\uff1a]\s*(\d+)\s*[:\uff1a]\s*(\d+)\s*\]?', text, re.I))
+    if len(matches) != 1 or tuple(map(int, matches[0].groups())) != tuple(expected):
         return None
-    owner = re.search(r'(?:^|\n)Player[ \t]*[:\uff1a][ \t]*([^\n]+)', text, re.I)
+    owners = list(re.finditer(r'(?:^|\n)Player[ \t]*[:\uff1a][ \t]*([^\n]+)', text, re.I))
+    if len(owners) > 1:
+        return None
+    owner = owners[0] if owners else None
     if owner:
         name = re.sub(r'\s*\[you\]\s*$', '', owner[1], flags=re.I).strip()
         if name:
@@ -55,17 +59,29 @@ async def verify_slot(reader, page, galaxy, system, position, data):
     await asyncio.sleep(1)
     previous = None
     previous_alliance = None
+    previous_source = None
+    previous_frame = None
     deadline = time.monotonic()+15
     for attempt in range(20 if efficient else 8):
         if time.monotonic()>deadline:
             break
         clip = {'x':25, 'y':230, 'width':420, 'height':450}
-        # Keep the detector's calibrated aspect ratio. RapidOCR scales the
-        # shortest side up to 736px; a narrow strip increases inference work.
-        if efficient and reader.config.get('sweep', {}).get('detail_ocr', True):
-            lines, image = await reader.observe(page, clip, detail=(attempt == 0 or previous is not None))
+        source, frame = 'ocr', None
+        rendered = None
+        if efficient and reader.config.get('sweep', {}).get('rendered_text', False):
+            rendered = await read_rendered_text(page, clip)
+        if rendered and parse_slot(rendered[1], expected, allow_nebula=(position == 21)):
+            frame, lines = rendered
+            source = 'rendered'
+            timings = getattr(reader, 'timings', None)
+            if isinstance(timings, dict):
+                timings['rendered_text_reads'] = timings.get('rendered_text_reads', 0) + 1
         else:
-            lines, image = await reader.observe(page, clip)
+            # Unsupported, incomplete or stale scene text keeps the OCR path.
+            if efficient and reader.config.get('sweep', {}).get('detail_ocr', True):
+                lines, _ = await reader.observe(page, clip, detail=(attempt == 0 or previous is not None))
+            else:
+                lines, _ = await reader.observe(page, clip)
         if time.monotonic() - getattr(reader, '_last_live_frame', 0) >= 5:
             try:
                 temporary = data / 'live-frame.tmp'
@@ -76,7 +92,8 @@ async def verify_slot(reader, page, galaxy, system, position, data):
                 pass
         result = parse_slot(lines, expected, allow_nebula=(position == 21))
         alliance = parse_alliance(lines) if result and result[0] == 'owned' else None
-        if result and result == previous:
+        if (result and result == previous and source == previous_source
+                and (source == 'ocr' or frame != previous_frame)):
             if position == 21:
                 actual = tuple([await reader.read_coordinate(page, x) for x in (89,235,381)])
                 if actual != expected:
@@ -86,6 +103,7 @@ async def verify_slot(reader, page, galaxy, system, position, data):
             return (*result, alliance if alliance == previous_alliance else None)
         previous = result
         previous_alliance = alliance
+        previous_source, previous_frame = source, frame
         await asyncio.sleep(.05 if efficient else .35)
     path = data / f'unverified-slot-{galaxy}-{system}-{position}.png'
     path.write_bytes(await page.screenshot())
@@ -122,8 +140,9 @@ async def verify_system(reader, page, galaxy, system, store, data):
     if set(checked) != set(range(1,22)):
         raise UncertainScreen(f'Incomplete 21-slot verification at {galaxy}:{system}; unresolved {errors}')
     if pending_count:
-        LOG.info('Read performance %s:%s: %s new slots in %.1fs; %s OCR calls, %s identical-frame reuses',
+        LOG.info('Read performance %s:%s: %s new slots in %.1fs; %s OCR calls, %s identical-frame reuses, %s rendered-text reads',
                  galaxy, system, pending_count, time.perf_counter()-started,
                  int(timings.get('ocr_calls',0)-before.get('ocr_calls',0)),
-                 int(timings.get('ocr_cache_hits',0)-before.get('ocr_cache_hits',0)))
+                 int(timings.get('ocr_cache_hits',0)-before.get('ocr_cache_hits',0)),
+                 int(timings.get('rendered_text_reads',0)-before.get('rendered_text_reads',0)))
     return {(galaxy, system, p) for p, row in checked.items() if row['kind'] == 'owned'}

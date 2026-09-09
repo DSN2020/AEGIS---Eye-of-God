@@ -13,6 +13,7 @@ Repository: [DSN2020/AEGIS---Eye-of-God](https://github.com/DSN2020/AEGIS---Eye-
 - Player coordinates grouped by owner, newest observations first, with name search and alliance filtering.
 - Newest-first activity, distinct account colors, and five-second highlights for incoming messages.
 - Automatic resizing between 1–6 agents using saved accounts. Unchanged workers keep their browser processes.
+- Reads displayed planet-detail text directly from the game renderer, with automatic OCR fallback. Every planet is still opened and confirmed.
 - Local Windows DPAPI protection for saved passwords.
 
 ## Windows setup
@@ -34,7 +35,7 @@ Closing EOG leaves the scanner running. **Pause scan** stops workers and retains
 ## Source and local data
 
 - `DesktopApp/`: desktop application and icon assets.
-- `ev_assistant/`: browser navigation, OCR, verification, credential protection, and storage.
+- `ev_assistant/`: browser navigation, rendered-text reading, OCR fallback, verification, credential protection, and storage.
 - `isolated_supervisor.py`: worker supervision and live resizing.
 - `app_bridge.py`: private process-input/output connection between EOG and the scanner.
 - `tests/`: automated checks.
@@ -53,3 +54,5 @@ dotnet build DesktopApp/EyeOfGod.csproj -c Release
 The optional `EOG.exe --verify-ui` check requires populated local reference observations. It does not start or stop workers.
 
 Fresh installations have six blank username/password slots. Add your own accounts in Manage; there are no bundled accounts. Saved account names, encrypted passwords, browser sessions, and scan results stay in the local ignored files. Share this repository or a clean build, not your working folder with its local configuration and data.
+
+The `sweep.rendered_text` setting enables the faster detail reader (enabled in new configurations). Existing configurations can set it to `true` and restart workers individually; setting it to `false` restores OCR-only detail verification. Each account retains its isolated browser and saved login. Live previews and checkpoints continue working. Run `python verify_rendered_text.py` for offline browser checks; `python benchmark_efficiency.py rendered-text --account YOUR_ACCOUNT` benchmarks an explicitly selected idle account.

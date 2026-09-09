@@ -41,7 +41,8 @@
     "verification_mode": "explicit-slots-v1",
     "efficient_slots": true,
     "detail_ocr": true,
-    "render_fps": 20
+    "render_fps": 20,
+    "rendered_text": true
   },
   "ocr_confidence": 0.9,
   "monitor_seconds": 15,

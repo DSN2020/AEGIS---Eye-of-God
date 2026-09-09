@@ -487,6 +487,8 @@ async def run_browser(args, config, data, store, accounts=None):
             if args.command == 'sweep':
                 await enable_frame_limit(page)
                 LOG.info('Scanner animation limit: %s FPS; OpenCV pool: 1 thread', fps)
+                LOG.info('Planet detail reader: %s', 'rendered text with OCR fallback'
+                         if config.get('sweep', {}).get('rendered_text', False) else 'OCR')
             if args.command == 'read':
                 await reader.monitor(page)
                 return

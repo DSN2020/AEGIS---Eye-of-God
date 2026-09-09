@@ -17,7 +17,8 @@ async def main(args):
     output.mkdir(parents=True,exist_ok=True)
     reader=Reader(config,output)
     reader.config['sweep']['efficient_slots'] = args.mode != 'baseline'
-    reader.config['sweep']['detail_ocr'] = args.mode == 'optimized-details'
+    reader.config['sweep']['detail_ocr'] = args.mode in ('optimized-details', 'rendered-text')
+    reader.config['sweep']['rendered_text'] = args.mode == 'rendered-text'
     async with async_playwright() as p:
         context=await p.chromium.launch_persistent_context(
             str(profile),headless=True,
@@ -55,6 +56,6 @@ async def main(args):
             await context.close()
 
 if __name__=='__main__':
-    parser=argparse.ArgumentParser();parser.add_argument('mode',choices=['baseline','optimized','optimized-details'])
+    parser=argparse.ArgumentParser();parser.add_argument('mode',choices=['baseline','optimized','optimized-details','rendered-text'])
     add_account_argument(parser)
     asyncio.run(main(parser.parse_args()))
