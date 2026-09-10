@@ -176,4 +176,3 @@ class Controller:
         except BaseException:
             self.journal.finish(key,'uncertain')
             raise
-

@@ -71,7 +71,7 @@ def validate(raw):
         action=rule.get('action','alert')
         if action not in ('alert','use_gamma'): raise ValueError('Only alerts or owned Gamma activation are supported; purchases are disabled')
         if action=='use_gamma' and (rule['metric']!='safe_runs' or rule['op']!='<=' or rule.get('value')!=0):
-            raise ValueError('Gamma activation requires safe_runs <= 0')
+            raise ValueError('Choose Safe nebula runs <= 0 for owned Gamma activation')
         result['rules'].append({'metric':rule['metric'],'op':rule['op'],'value':number(rule.get('value'),'Watch threshold',-1e15),
             'action':action,'cooldown':number(rule.get('cooldown',300),'Alert cooldown',10,86400*30)})
     return result
