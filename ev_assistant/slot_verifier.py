@@ -1,9 +1,10 @@
-"""Explicit 21-slot coverage. A map pan is never evidence of complete coverage."""
+"""Explicit checks of required positions; excluded slots get no fake receipts."""
 import asyncio
 import logging
 import re
 import time
 from .store import Planet
+from .coverage import sweep_positions
 from .rendered_text import read_rendered_text
 from .vision import UncertainScreen, compact, join_rows
 
@@ -111,14 +112,15 @@ async def verify_slot(reader, page, galaxy, system, position, data):
 
 async def verify_system(reader, page, galaxy, system, store, data):
     universe = reader.config['universe']
+    positions = sweep_positions(reader.config)
     checked = store.checked_slots(REVISION, universe, galaxy, system)
     started = time.perf_counter()
-    pending_count = 21 - len(checked)
+    pending_count = len(set(positions) - set(checked))
     timings = getattr(reader, 'timings', {})
     timings = timings if isinstance(timings, dict) else {}
     before = dict(timings)
     errors = []
-    for position in range(1,22):
+    for position in positions:
         if position in checked:
             continue
         reader.check_stop()
@@ -137,12 +139,13 @@ async def verify_system(reader, page, galaxy, system, store, data):
         store.record_slot_check(REVISION, universe, galaxy, system, position, kind, owner)
         LOG.info('Worker 1 verified slot %s:%s:%s (%s)', galaxy, system, position, kind)
     checked = store.checked_slots(REVISION, universe, galaxy, system)
-    if set(checked) != set(range(1,22)):
-        raise UncertainScreen(f'Incomplete 21-slot verification at {galaxy}:{system}; unresolved {errors}')
+    if not set(positions).issubset(checked):
+        raise UncertainScreen(f'Incomplete {len(positions)}-slot verification at {galaxy}:{system}; unresolved {errors}')
     if pending_count:
         LOG.info('Read performance %s:%s: %s new slots in %.1fs; %s OCR calls, %s identical-frame reuses, %s rendered-text reads',
                  galaxy, system, pending_count, time.perf_counter()-started,
                  int(timings.get('ocr_calls',0)-before.get('ocr_calls',0)),
                  int(timings.get('ocr_cache_hits',0)-before.get('ocr_cache_hits',0)),
                  int(timings.get('rendered_text_reads',0)-before.get('rendered_text_reads',0)))
-    return {(galaxy, system, p) for p, row in checked.items() if row['kind'] == 'owned'}
+    return {(galaxy, system, p) for p, row in checked.items()
+            if p in positions and row['kind'] == 'owned'}

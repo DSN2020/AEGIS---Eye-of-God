@@ -9,7 +9,7 @@ Repository: [DSN2020/AEGIS---Eye-of-God](https://github.com/DSN2020/AEGIS---Eye-
 - WPF app with live worker status, game previews, and account management.
 - Python + Playwright with separate browser profiles and an optional shared-Chrome mode.
 - RapidOCR reads the canvas. Every unverified slot is opened and checked before recording ownership.
-- Resumable coverage of nine galaxies, 499 systems each, and 21 slots per system. Unresolved slots remain queued for retry.
+- Resumable coverage of nine galaxies and 499 systems each. The default sweep checks positions 5–20 (16 per system), skipping NPC positions 1–4 and nebula position 21. Unresolved required positions remain queued for retry.
 - Player coordinates grouped by owner, newest observations first, with name search and alliance filtering.
 - Newest-first activity, distinct account colors, and one-second fades from account colors to gray for incoming messages.
 - Automatic resizing between 1–10 agents using saved accounts. Unchanged workers keep their browser processes.

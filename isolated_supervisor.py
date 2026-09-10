@@ -11,6 +11,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 from ev_assistant.limits import MAX_AGENTS
+from ev_assistant.coverage import sweep_positions
 from ev_assistant.shared_browser import SharedBrowserHost
 from ev_assistant.store import Store
 from ev_assistant.__main__ import export_players
@@ -86,6 +87,23 @@ def prepare_jobs(data, galaxies):
                 'retry_holes': [key for key in holes if key.startswith(f'{galaxy}:')],
             }):
                 raise RuntimeError('Cannot initialize galaxy coverage')
+
+
+def prune_completed_holes(data, galaxies, store, config):
+    """A missing excluded slot must not keep an old system in the retry queue."""
+    required = set(sweep_positions(config))
+    for galaxy in galaxies:
+        coverage = coverage_for(data, galaxy)
+        retained = []
+        for key in coverage['retry_holes']:
+            g, system = map(int, key.split(':'))
+            checked = store.checked_slots(config['sweep']['verification_mode'],
+                                          config['universe'], g, system)
+            if not required.issubset(checked):
+                retained.append(key)
+        if retained != coverage['retry_holes']:
+            coverage['retry_holes'] = retained
+            atomic_json(data / 'galaxies' / str(galaxy) / 'coverage.json', coverage)
 
 
 def stop_tree(process):
@@ -277,13 +295,16 @@ def main():
         LOG.error('A scan supervisor is already running')
         return
     config = read_json(ROOT / 'config.json', {})
+    positions = sweep_positions(config)
     galaxies, end = config['sweep']['galaxies'], config['sweep']['system_end']
     prepare_jobs(DATA, galaxies)
+    store = Store(DATA / 'observations.sqlite')
+    if config['sweep'].get('verification_mode') == 'explicit-slots-v1':
+        prune_completed_holes(DATA, galaxies, store, config)
     pending = pending_galaxies(DATA, galaxies, end)
     slots = [Slot(index, config) for index in range(config['sweep']['workers'])]
     browser_mode = config['sweep'].get('browser_mode', 'isolated')
     host = SharedBrowserHost(ROOT, DATA) if browser_mode == 'shared' else None
-    store = Store(DATA / 'observations.sqlite')
     atomic_json(DATA / 'supervisor-pids.json', {'pid': os.getpid(), 'started': stamp()})
     try:
         while True:
@@ -311,8 +332,9 @@ def main():
             else:
                 requested.pop('_shared_browser_endpoint', None)
             try:
+                requested_positions = sweep_positions(requested)
                 reconcile_slots(slots, pending, requested)
-                config = requested
+                config, positions = requested, requested_positions
             except ValueError as exc:
                 LOG.error('Keeping current worker configuration: %s', exc)
             command_path = DATA / 'worker-command.json'
@@ -344,13 +366,15 @@ def main():
                                      slot.process is not None for slot in slots),
                 'retryingWorkers': sum(slot.state == 'retrying' for slot in slots),
                 'queuedGalaxies': pending,
-                'completedSystems': (store.checked_system_count(config['sweep']['verification_mode'])
+                'completedSystems': (store.checked_system_count(config['sweep']['verification_mode'], positions)
                     if config['sweep'].get('verification_mode') == 'explicit-slots-v1'
                     else sum(int(value) for value in progress.values()) - len(holes)),
                 'totalSystems': len(galaxies) * end, 'retrySystems': len(holes),
                 'verificationMode': config['sweep'].get('verification_mode', 'legacy-three-views'),
-                'verifiedPlanetSlots': store.checked_slot_count(config['sweep'].get('verification_mode', '')),
-                'totalPlanetSlots': len(galaxies) * end * 21,
+                'verifiedPlanetSlots': store.checked_slot_count(config['sweep'].get('verification_mode', ''), positions),
+                'totalPlanetSlots': len(galaxies) * end * len(positions),
+                'requiredSlotsPerSystem': len(positions), 'requiredPositions': list(positions),
+                'skippedPositions': [p for p in range(1, 22) if p not in positions],
                 'workers': {str(slot.index + 1): slot.status() for slot in slots}})
             try:
                 export_players(store, DATA)

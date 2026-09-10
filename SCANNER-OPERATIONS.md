@@ -1,5 +1,13 @@
 # Eternal Void scanner
 
+## Current scan scope — September 9
+
+The user identified positions 1–4 as NPC slots and position 21 as the nebula. The local and example configurations now set `sweep.positions` to 5–20. Each required position still uses the same clicked detail and two-read confirmation. No synthetic NPC observations or verification receipts are written for excluded positions. The active total is 4,491 × 16 = 71,856 positions. Status exposes required and skipped positions, and the desktop reports the corresponding totals.
+
+Existing `explicit-slots-v1` receipts remain valid and are reused. Stored player observations are preserved. A system completes when every required position has a receipt, irrespective of old receipts at excluded positions. Startup removes old retry holes only when all currently required receipts exist; genuine missing player-position checks remain queued. Initial navigation and retries start at the first required position. Configurations without `sweep.positions` retain the legacy 21-position scope. Change scope while paused, then resume to apply it to workers; expanding a previously reduced scope requires a separate coverage reconciliation before treating old completed frontiers as full coverage.
+
+The older full-coverage notes below describe the previous 21-position scope, not the current required total.
+
 ## Coverage correction — September 9
 
 The original three-map-view sweep missed planets between views. System 9:57 was logged as complete with zero players, but direct UI confirmation found XXxxNAZIMxxXX at 9:57:14. Its old completion percentage is not evidence of complete planet coverage. Existing ownership observations remain useful; all systems require verification with the replacement reader.

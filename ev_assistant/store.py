@@ -224,15 +224,23 @@ class Store:
             db.execute('INSERT OR REPLACE INTO slot_checks VALUES (?,?,?,?,?,?,?,?)',
                 (revision, universe, galaxy, system, position, kind, owner, time.time()))
 
-    def checked_slot_count(self, revision):
+    def checked_slot_count(self, revision, positions=tuple(range(1, 22))):
+        if not positions:
+            return 0
+        marks = ','.join('?' for _ in positions)
         with self.connection() as db:
-            return db.execute('SELECT count(*) FROM slot_checks WHERE revision=?', (revision,)).fetchone()[0]
+            return db.execute(f'SELECT count(*) FROM slot_checks WHERE revision=? AND position IN ({marks})',
+                              (revision, *positions)).fetchone()[0]
 
-    def checked_system_count(self, revision):
+    def checked_system_count(self, revision, positions=tuple(range(1, 22))):
+        if not positions:
+            return 0
+        marks = ','.join('?' for _ in positions)
         with self.connection() as db:
-            return db.execute('''SELECT count(*) FROM (
-                SELECT universe,galaxy,system FROM slot_checks WHERE revision=?
-                GROUP BY universe,galaxy,system HAVING count(*)=21)''', (revision,)).fetchone()[0]
+            return db.execute(f'''SELECT count(*) FROM (
+                SELECT universe,galaxy,system FROM slot_checks WHERE revision=? AND position IN ({marks})
+                GROUP BY universe,galaxy,system HAVING count(*)=?)''',
+                (revision, *positions, len(set(positions)))).fetchone()[0]
 
     def record_alliance(self, universe, player, alliance, now=None):
         if alliance is None:

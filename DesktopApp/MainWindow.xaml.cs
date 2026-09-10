@@ -115,7 +115,9 @@ public partial class MainWindow : Window
             SlotStat.Text=N(status,"verifiedPlanetSlots").ToString("N0");
             SlotNote.Text=$"of {N(status,"totalPlanetSlots",94311):N0} across 9 galaxies";
             PlayerStat.Text=N(snapshot,"playerCount").ToString("N0"); CoordinateNote.Text=$"{N(snapshot,"coordinateCount"):N0} confirmed coordinates";
-            SystemStat.Text=N(status,"completedSystems").ToString("N0"); SystemNote.Text=$"of {N(status,"totalSystems",4491):N0} · all 21 slots required";
+            SystemStat.Text=N(status,"completedSystems").ToString("N0"); SystemNote.Text=$"of {N(status,"totalSystems",4491):N0} · {N(status,"requiredSlotsPerSystem",21)} slots required";
+            var skipped=status.TryGetProperty("skippedPositions",out var skippedSlots) ? string.Join(", ",skippedSlots.EnumerateArray().Select(p=>p.GetInt32())) : "";
+            ScopeNote.Text=skipped.Length>0 ? $"Skipped positions: {skipped}. Only required positions count toward coverage. Earlier findings remain available." : "Coverage uses individual slot checks. Earlier findings stay in the directory while all systems are verified.";
             int selected=(WorkerList.SelectedItem as WorkerEntry)?.Id ?? 1;
             workers=snapshot.GetProperty("workers").EnumerateArray().Select(w=>new WorkerEntry {
                 Id=N(w,"id"),Account=S(w,"account"),State=S(w,"state"),Detail=S(w,"detail"),Galaxy=S(w,"galaxy","—"),

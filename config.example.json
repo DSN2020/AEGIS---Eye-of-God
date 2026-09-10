@@ -43,7 +43,25 @@
     "detail_ocr": true,
     "render_fps": 20,
     "rendered_text": true,
-    "browser_mode": "isolated"
+    "browser_mode": "isolated",
+    "positions": [
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20
+    ]
   },
   "ocr_confidence": 0.9,
   "monitor_seconds": 15,

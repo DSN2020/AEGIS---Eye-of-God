@@ -16,6 +16,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from .store import Planet, Store
+from .coverage import sweep_positions
 from .vision import (OCR, TextLine, UncertainScreen, read_owner, compact,
                      popup_kind, map_header_readable, join_rows)
 
@@ -30,6 +31,7 @@ def load_config(path):
         raise ValueError('This adapter is calibrated only for Eternal Void')
     if config['viewport'] != {'width': 470, 'height': 912}:
         raise ValueError('This calibration requires a 470 by 912 viewport')
+    sweep_positions(config)
     scan = config['scan']
     for key in ('galaxies', 'systems', 'positions'):
         if not scan[key] or any(type(n) is not int or n <= 0 for n in scan[key]):
@@ -529,6 +531,7 @@ async def run_browser(args, config, data, store, accounts=None):
                     progress = coverage['progress']
                     retry_holes = set(coverage['retry_holes'])
                 sweep = config['sweep']
+                first_position = sweep_positions(config)[0]
                 systems = sweep.get('systems') or list(range(
                     int(sweep['system_start']), int(sweep['system_end']) + 1))
                 galaxy_queue = asyncio.Queue()
@@ -641,7 +644,7 @@ async def run_browser(args, config, data, store, accounts=None):
                                     await asyncio.sleep(min(30, retry_round * 2))
                                 pan_direction = 1
                                 await worker_reader.open_map_coordinate(
-                                    worker_page, (galaxy, current_pass[0], 1))
+                                    worker_page, (galaxy, current_pass[0], first_position))
                                 await worker_reader.force_edge(worker_page, -1)
                                 for index, system in enumerate(current_pass):
                                     worker_reader.check_stop()
@@ -660,7 +663,7 @@ async def run_browser(args, config, data, store, accounts=None):
                                                         attempt, exc)
                                             await worker_page.keyboard.press('Escape')
                                             await worker_reader.open_map_coordinate(
-                                                worker_page, (galaxy, system, 1))
+                                                worker_page, (galaxy, system, first_position))
                                             await worker_reader.force_edge(worker_page, -1)
                                             pan_direction = 1
                                     if seen is None:
