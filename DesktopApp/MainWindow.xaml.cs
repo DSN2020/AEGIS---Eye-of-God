@@ -41,7 +41,7 @@ public partial class MainWindow : Window
     private readonly bool verifyUi = Environment.GetCommandLineArgs().Contains("--verify-ui");
 
     public MainWindow() {
-        InitializeComponent(); BuildAccountRows(); ActivityList.ItemsSource=activityRows;
+        InitializeComponent(); SetCoordinateView(false); BuildAccountRows(); ActivityList.ItemsSource=activityRows;
         highlightTimer.Tick+=(_,_)=>ExpireActivityHighlights(activityClock.Elapsed);
         highlightTimer.Start();
         countTimer.Tick+=async (_,_)=> { countTimer.Stop(); await ApplyCountChange(); };
@@ -260,9 +260,18 @@ public partial class MainWindow : Window
         string name=PlayerSearch.Text.Trim(),alliance=AllianceSearch.Text.Trim();
         filteredPlayers=allPlayers.Where(p=>p.Name.Contains(name,StringComparison.OrdinalIgnoreCase) && p.AllianceLabel.Contains(alliance,StringComparison.OrdinalIgnoreCase)).ToList();
         PlayerCards.ItemsSource=filteredPlayers;
+        Hives?.Update(allPlayers,name,alliance);
         ResultsCount.Text=$"{filteredPlayers.Count:N0} players · {filteredPlayers.Sum(p=>p.Coordinates.Length):N0} coordinates";
         NoPlayers.Visibility=filteredPlayers.Count==0 ? Visibility.Visible : Visibility.Collapsed;
         if(CopyShownButton!=null) CopyShownButton.IsEnabled=filteredPlayers.Count>0;
+    }
+    private void ShowDirectory(object s,RoutedEventArgs e) => SetCoordinateView(false);
+    private void ShowHives(object s,RoutedEventArgs e) => SetCoordinateView(true);
+    private void SetCoordinateView(bool hive)
+    {
+        PlayerDirectory.Visibility=PlayerResults.Visibility=hive?Visibility.Collapsed:Visibility.Visible;
+        Hives.Visibility=hive?Visibility.Visible:Visibility.Collapsed;
+        HivesButton.IsEnabled=!hive;DirectoryButton.IsEnabled=hive;
     }
     private void ClearFilters(object s,RoutedEventArgs e) { PlayerSearch.Clear(); AllianceSearch.Clear(); }
     private void CopyPlayer(object s,RoutedEventArgs e) { try {Clipboard.SetText(((Button)s).Tag?.ToString()??"");ShowMessage("Player copied in Discord format.");} catch(Exception){ShowMessage("The clipboard is busy. Try again.",true);} }
@@ -367,6 +376,12 @@ public partial class MainWindow : Window
             var bitmap=new RenderTargetBitmap((int)ActualWidth,(int)ActualHeight,96,96,PixelFormats.Pbgra32);bitmap.Render(this);
             var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(bitmap));using var file=File.Create(Path.Combine(output,item.Item2+".png"));encoder.Save(file);
         }
+        ShowPage(NavPlayers);SetCoordinateView(true);Hives.Verify();
+        await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle);UpdateLayout();
+        var hiveBitmap=new RenderTargetBitmap((int)ActualWidth,(int)ActualHeight,96,96,PixelFormats.Pbgra32);hiveBitmap.Render(this);
+        var hiveEncoder=new PngBitmapEncoder();hiveEncoder.Frames.Add(BitmapFrame.Create(hiveBitmap));
+        using(var hiveFile=File.Create(Path.Combine(output,"hives.png")))hiveEncoder.Save(hiveFile);
+        SetCoordinateView(false);
         ShowPage(NavAutomation); Automation.VerifyEditor(); await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle); UpdateLayout();
         var planBitmap=new RenderTargetBitmap((int)ActualWidth,(int)ActualHeight,96,96,PixelFormats.Pbgra32);planBitmap.Render(this);
         var planEncoder=new PngBitmapEncoder();planEncoder.Frames.Add(BitmapFrame.Create(planBitmap));
@@ -379,7 +394,7 @@ public partial class MainWindow : Window
         var bottomBitmap=new RenderTargetBitmap((int)ActualWidth,(int)ActualHeight,96,96,PixelFormats.Pbgra32);bottomBitmap.Render(this);
         var bottomEncoder=new PngBitmapEncoder();bottomEncoder.Frames.Add(BitmapFrame.Create(bottomBitmap));
         using(var bottomFile=File.Create(Path.Combine(output,"accounts-bottom.png"))) bottomEncoder.Save(bottomFile);
-        await File.WriteAllTextAsync(Path.Combine(output,"verification.json"),JsonSerializer.Serialize(new {passed=true,automationEditor=true,blankAccountSlots=true,accountSlots=MaxAgents,tenAccountRequest=true,tenAccountColors=true,search=true,allianceFilter=true,agentBounds=true,activityChronology=true,accountColors=true,oneSecondFade=true,grayAfterFade=true,noRepeatFlash=true,playerRecency=true,players=allPlayers.Count,workers=workers.Count}));
+        await File.WriteAllTextAsync(Path.Combine(output,"verification.json"),JsonSerializer.Serialize(new {passed=true,hiveView=true,automationEditor=true,blankAccountSlots=true,accountSlots=MaxAgents,tenAccountRequest=true,tenAccountColors=true,search=true,allianceFilter=true,agentBounds=true,activityChronology=true,accountColors=true,oneSecondFade=true,grayAfterFade=true,noRepeatFlash=true,playerRecency=true,players=allPlayers.Count,workers=workers.Count}));
     }
 }
 
@@ -387,11 +402,4 @@ public sealed class WorkerEntry {
  public int Id {get;set;} public string Account {get;set;}="";public string State {get;set;}="";public string Detail {get;set;}="";public string Galaxy {get;set;}="";public string LastCompleted {get;set;}="";public int Restarts {get;set;}public string FramePath {get;set;}="";public double FrameUpdated {get;set;}
  public string Label=>$"{Id:00}  {Account}";public string StateLabel=>State.ToUpperInvariant();public string StateColor=>State=="active"?"#55D6A0":State=="retrying"?"#E6B450":"#9B9B9B";
  public string Summary=>$"Galaxy {Galaxy}   ·   Last complete {LastCompleted}   ·   {Restarts} restarts";
-}
-public sealed class PlayerEntry {
- public string Name {get;set;}="";public string? Alliance {get;set;}public string[] Coordinates {get;set;}=[];public double Observed {get;set;}
- public string AllianceLabel=>Alliance==null?"Not recorded":Alliance.Length==0 || Alliance=="-"?"No alliance":Alliance;
- public string CoordinatesText=>string.Join("   ·   ",Coordinates);
- public string CountLabel=>$"{Coordinates.Length} coordinates  ·  Last seen {DateTimeOffset.FromUnixTimeSeconds((long)Observed).LocalDateTime:MMM d, h:mm tt}";
- public string CopyText=>$"{Name}  [{AllianceLabel}]\n```\n{string.Join(" · ",Coordinates)}\n```";
 }

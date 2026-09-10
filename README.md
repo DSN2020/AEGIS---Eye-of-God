@@ -72,3 +72,14 @@ To return to the original arrangement, pause, set `sweep.browser_mode` to `"isol
 ## Upgrade bot tab
 
 EOG includes account profiles, ordered upgrade plans, saved presets, scheduled checks and resource, energy and safe-run watch alerts. Owned Gamma rules can restore exhausted safe runs, with a per-account 24-hour limit; purchases are disabled. Auto mode restores power before following the plan. Profiles start paused and borrow only their selected scanner account while running. See [AUTOMATION.md](AUTOMATION.md) for setup, supported screens and current limitations.
+
+
+## Hives in Player coordinates
+
+Open **Player coordinates → Hives** to find concentrations of recorded human-owned planets. The default is at least **8 planets within 3 consecutive system numbers** in one galaxy. Both limits are adjustable (2–160 planets, 1–10 systems). A single player or several players can form a hive; alliances do not restrict membership.
+
+Cards list the galaxy/system range, totals per system, each member's alliance, local planet count and coordinates. Largest qualifying windows are selected first, with tighter windows winning ties; overlapping windows are discarded so a planet never counts in two hives. Long concentrations are split into bounded groups rather than chained into one unlimited range. The grouping is a configurable estimate from collected coordinates, not an official game designation, and can change as scanning finds more planets.
+
+Name and alliance filters find hives containing a member who matches both filters. All members of those hives remain visible for context. **Copy hive** and **Copy shown hives** copy exactly the displayed groups with compact Discord coordinate blocks. Detection updates with the directory and makes no additional game requests.
+
+Run `dotnet run --project tests/HiveChecks/HiveChecks.csproj -c Release` for clustering, filtering, boundaries, deduplication and copy-format checks. The desktop `--verify-ui` check also captures the Hive view.
