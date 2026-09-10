@@ -202,6 +202,11 @@ class ApplicationBridge:
 
     def dispatch(self, request):
         command = request.get('command')
+        if isinstance(command,str) and command.startswith('automation_'):
+            from eog_automation.service import Service
+            service=Service(self.root)
+            try: return service.dispatch(request)
+            finally: service.db.close()
         if command == 'snapshot': return self.snapshot()
         if command == 'settings': return self.settings()
         if command == 'start': return self.start()

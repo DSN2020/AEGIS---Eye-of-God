@@ -65,6 +65,7 @@ public partial class MainWindow : Window
             bridge=Process.Start(info) ?? throw new InvalidOperationException("Could not start the scanner connection.");
             _=bridge.StandardError.ReadToEndAsync();
             LoadSettings(await Request(new { command="settings" }));
+            Automation.Request=Request; await Automation.Poll();
             await RefreshSnapshot();
             if(verifyUi) { await VerifyAndCapture(); Close(); return; }
             timer.Tick+=async (_,_) => await RefreshSnapshot(); timer.Start();
@@ -134,6 +135,7 @@ public partial class MainWindow : Window
                 ApplyFilters();
             }
             UpdateActivity(snapshot.GetProperty("activity"),activityClock.Elapsed);
+            if(Automation.IsVisible) await Automation.Poll();
             UpdatedText.Text="Updated "+DateTime.Now.ToString("h:mm:ss tt");
             if(DateTime.Now>messageUntil) { StatusText.Text=state=="running" ? "Connected · confirmations and player records update automatically" : "Scan "+state+" · saved findings remain available"; StatusText.Foreground=(Brush)FindResource("SubTextBrush"); }
         } catch(Exception ex) { ShowMessage(ex.Message,true); }
@@ -249,7 +251,8 @@ public partial class MainWindow : Window
         PlayersView.Visibility=selected==NavPlayers ? Visibility.Visible : Visibility.Collapsed;
         AccountsView.Visibility=selected==NavAccounts ? Visibility.Visible : Visibility.Collapsed;
         ActivityView.Visibility=selected==NavActivity ? Visibility.Visible : Visibility.Collapsed;
-        foreach(var button in new[]{NavLive,NavPlayers,NavAccounts,NavActivity}) button.Style=(Style)FindResource(button==selected ? "NavButtonActive" : "NavButton");
+        Automation.Visibility=selected==NavAutomation ? Visibility.Visible : Visibility.Collapsed;
+        foreach(var button in new[]{NavLive,NavPlayers,NavAccounts,NavActivity,NavAutomation}) button.Style=(Style)FindResource(button==selected ? "NavButtonActive" : "NavButton");
     }
     private void FilterChanged(object s,TextChangedEventArgs e) { if(PlayerCards!=null) ApplyFilters(); }
     private void ApplyFilters()
@@ -359,11 +362,16 @@ public partial class MainWindow : Window
         if(activityRows.Any(r=>r.Highlighted)) throw new Exception("Old messages flashed again on refresh");
         UpdateActivity(realActivity,activityClock.Elapsed);
         if(!allPlayers.Select(p=>p.Observed).SequenceEqual(allPlayers.OrderByDescending(p=>p.Observed).Select(p=>p.Observed))) throw new Exception("Player recency order failed");
-        foreach(var item in new[]{(NavLive,"overview"),(NavPlayers,"players"),(NavAccounts,"accounts"),(NavActivity,"activity")}) {
+        foreach(var item in new[]{(NavLive,"overview"),(NavPlayers,"players"),(NavAccounts,"accounts"),(NavActivity,"activity"),(NavAutomation,"automation")}) {
             ShowPage(item.Item1); await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle); UpdateLayout();
             var bitmap=new RenderTargetBitmap((int)ActualWidth,(int)ActualHeight,96,96,PixelFormats.Pbgra32);bitmap.Render(this);
             var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(bitmap));using var file=File.Create(Path.Combine(output,item.Item2+".png"));encoder.Save(file);
         }
+        ShowPage(NavAutomation); Automation.VerifyEditor(); await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle); UpdateLayout();
+        var planBitmap=new RenderTargetBitmap((int)ActualWidth,(int)ActualHeight,96,96,PixelFormats.Pbgra32);planBitmap.Render(this);
+        var planEncoder=new PngBitmapEncoder();planEncoder.Frames.Add(BitmapFrame.Create(planBitmap));
+        using(var planFile=File.Create(Path.Combine(output,"automation-plan.png"))) planEncoder.Save(planFile);
+        Automation.FinishVerification();
         ShowPage(NavAccounts); AccountsView.ScrollToEnd();
         await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle); UpdateLayout();
         var lastFieldPosition=usernames[^1].TransformToAncestor(this).Transform(new Point(0,0));
@@ -371,7 +379,7 @@ public partial class MainWindow : Window
         var bottomBitmap=new RenderTargetBitmap((int)ActualWidth,(int)ActualHeight,96,96,PixelFormats.Pbgra32);bottomBitmap.Render(this);
         var bottomEncoder=new PngBitmapEncoder();bottomEncoder.Frames.Add(BitmapFrame.Create(bottomBitmap));
         using(var bottomFile=File.Create(Path.Combine(output,"accounts-bottom.png"))) bottomEncoder.Save(bottomFile);
-        await File.WriteAllTextAsync(Path.Combine(output,"verification.json"),JsonSerializer.Serialize(new {passed=true,blankAccountSlots=true,accountSlots=MaxAgents,tenAccountRequest=true,tenAccountColors=true,search=true,allianceFilter=true,agentBounds=true,activityChronology=true,accountColors=true,oneSecondFade=true,grayAfterFade=true,noRepeatFlash=true,playerRecency=true,players=allPlayers.Count,workers=workers.Count}));
+        await File.WriteAllTextAsync(Path.Combine(output,"verification.json"),JsonSerializer.Serialize(new {passed=true,automationEditor=true,blankAccountSlots=true,accountSlots=MaxAgents,tenAccountRequest=true,tenAccountColors=true,search=true,allianceFilter=true,agentBounds=true,activityChronology=true,accountColors=true,oneSecondFade=true,grayAfterFade=true,noRepeatFlash=true,playerRecency=true,players=allPlayers.Count,workers=workers.Count}));
     }
 }
 

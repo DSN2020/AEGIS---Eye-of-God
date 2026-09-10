@@ -68,3 +68,7 @@ Set `sweep.browser_mode` to `"shared"` in your local `config.json`, then pause a
 Each worker remains an independent Python process. Restarting or removing an agent closes only that agent's context. If the shared browser crashes, the supervisor relaunches it and reconnects the workers from their saved receipts. Cookies and local storage are saved per account with Windows DPAPI under ignored `data/browser-sessions/`. The local Playwright endpoint is runtime-only and bound to loopback. It is not published with the source.
 
 To return to the original arrangement, pause, set `sweep.browser_mode` to `"isolated"`, and resume. Existing persistent profiles are retained. Browser mode changes require a supervisor restart; agent-count changes remain live. Run `python verify_shared_browser.py` for offline browser isolation, encrypted-session, individual-worker crash and shared-browser recovery checks. Sharing Chrome reduces duplicated browser infrastructure; game renderers and OCR workers still consume resources.
+
+## Upgrade bot tab
+
+EOG includes account profiles, ordered upgrade plans, saved presets, scheduled checks and resource, energy and safe-run watch alerts. Owned Gamma rules can restore exhausted safe runs, with a per-account 24-hour limit; purchases are disabled. Auto mode restores power before following the plan. Profiles start paused and borrow only their selected scanner account while running. See [AUTOMATION.md](AUTOMATION.md) for setup, supported screens and current limitations.

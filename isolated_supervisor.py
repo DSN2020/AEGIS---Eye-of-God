@@ -208,7 +208,12 @@ class Slot:
         self.start(self.galaxy)
 
     def service(self, pending, end):
+        from eog_automation.service import reserved_accounts
         try:
+            if self.account.casefold() in reserved_accounts(self.data):
+                self.close()
+                self.state, self.detail = 'managing', 'Account reserved by an upgrade/watch profile'
+                return
             if self.process is not None:
                 self.observe_log()
                 if self.process.poll() is not None and (self.process.returncode == 0 or
@@ -343,7 +348,7 @@ def main():
                 command_path.unlink(missing_ok=True)
                 index = command.get('index',0)-1
                 if command.get('action') == 'restart' and 0 <= index < len(slots):
-                    if browser_ready and slots[index].process is not None:
+                    if browser_ready and slots[index].process is not None and slots[index].state != 'managing':
                         slots[index].restart('Requested in EOG')
             if browser_ready:
                 for slot in slots:
@@ -361,7 +366,7 @@ def main():
                 'browserMode': browser_mode,
                 'sharedBrowserPid': host.info.get('browserPid') if host else None,
                 'browserState': 'ready' if browser_ready else 'retrying',
-                'updated': stamp(), 'expectedWorkers': len(slots), 'liveWorkerResize': True,
+                'updated': stamp(), 'expectedWorkers': len(slots), 'liveWorkerResize': True, 'accountReservationsSupported': True,
                 'activeWorkers': sum(slot.state in ('active', 'retrying') and
                                      slot.process is not None for slot in slots),
                 'retryingWorkers': sum(slot.state == 'retrying' for slot in slots),
