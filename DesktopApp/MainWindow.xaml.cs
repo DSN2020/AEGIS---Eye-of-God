@@ -257,10 +257,18 @@ public partial class MainWindow : Window
         PlayerCards.ItemsSource=filteredPlayers;
         ResultsCount.Text=$"{filteredPlayers.Count:N0} players · {filteredPlayers.Sum(p=>p.Coordinates.Length):N0} coordinates";
         NoPlayers.Visibility=filteredPlayers.Count==0 ? Visibility.Visible : Visibility.Collapsed;
+        if(CopyShownButton!=null) CopyShownButton.IsEnabled=filteredPlayers.Count>0;
     }
     private void ClearFilters(object s,RoutedEventArgs e) { PlayerSearch.Clear(); AllianceSearch.Clear(); }
-    private void CopyPlayer(object s,RoutedEventArgs e) { try {Clipboard.SetText(((Button)s).Tag?.ToString()??"");ShowMessage("Player coordinates copied.");} catch(Exception){ShowMessage("The clipboard is busy. Try again.",true);} }
-    private void CopyMatching(object s,RoutedEventArgs e) { try {Clipboard.SetText(string.Join("\n\n",filteredPlayers.Select(p=>p.CopyText)));ShowMessage("Matching coordinates copied.");} catch(Exception){ShowMessage("The clipboard is busy. Try again.",true);} }
+    private void CopyPlayer(object s,RoutedEventArgs e) { try {Clipboard.SetText(((Button)s).Tag?.ToString()??"");ShowMessage("Player copied in Discord format.");} catch(Exception){ShowMessage("The clipboard is busy. Try again.",true);} }
+    private void CopyMatching(object s,RoutedEventArgs e)
+    {
+        if(filteredPlayers.Count==0) { ShowMessage("No matching players to copy."); return; }
+        try {
+            Clipboard.SetText(string.Join("\n\n",filteredPlayers.Select(p=>p.CopyText)));
+            ShowMessage($"Copied {filteredPlayers.Count:N0} shown players in Discord format.");
+        } catch(Exception) { ShowMessage("The clipboard is busy. Try again.",true); }
+    }
     private void WorkerSelected(object s,SelectionChangedEventArgs e) => UpdatePreview();
     private void UpdatePreview()
     {
@@ -375,5 +383,5 @@ public sealed class PlayerEntry {
  public string AllianceLabel=>Alliance==null?"Not recorded":Alliance.Length==0 || Alliance=="-"?"No alliance":Alliance;
  public string CoordinatesText=>string.Join("   ·   ",Coordinates);
  public string CountLabel=>$"{Coordinates.Length} coordinates  ·  Last seen {DateTimeOffset.FromUnixTimeSeconds((long)Observed).LocalDateTime:MMM d, h:mm tt}";
- public string CopyText=>$"{Name}  [{AllianceLabel}]\n"+string.Join("\n",Coordinates.Select(c=>"  "+c));
+ public string CopyText=>$"{Name}  [{AllianceLabel}]\n```\n{string.Join(" · ",Coordinates)}\n```";
 }
