@@ -149,7 +149,10 @@ class Reader:
         passwords = account.get('passwords') or [account.get('password', '')]
         password_index = 0
         last_diagnostic = 0
-        deadline = time.monotonic() + 90
+        # Fresh isolated contexts may load game assets concurrently. Keep the
+        # allowance below the supervisor's 360-second startup watchdog.
+        shared = getattr(self, 'config', {}).get('_shared_browser_endpoint')
+        deadline = time.monotonic() + (240 if shared else 90)
         while time.monotonic() < deadline:
             lines, entry_image = await self.observe(page)
             text = '\n'.join(x.text for x in lines if x.confidence >= 0.75)
@@ -462,11 +465,10 @@ async def run_browser(args, config, data, store, accounts=None):
     reader = Reader(config, data)
     async with async_playwright() as playwright:
         extra_browsers = []
-        browser = await playwright.chromium.launch_persistent_context(
-            str(config.get('browser_profile', data / 'browser-profile')),
-            headless=(args.command == 'sweep'),
-            executable_path=r'C:\Program Files\Google\Chrome\Application\chrome.exe',
-            viewport=config['viewport'], device_scale_factor=1)
+        from .shared_browser import AccountBrowser
+        account_browser = AccountBrowser(config, data,
+            accounts[0]['username'] if accounts else None)
+        browser = await account_browser.open(playwright, headless=(args.command == 'sweep'))
         try:
             if args.command == 'sweep':
                 from .performance import install_frame_limit, enable_frame_limit
@@ -482,6 +484,8 @@ async def run_browser(args, config, data, store, accounts=None):
                 print('\nResuming saved Eternal Void session and sweep checkpoint...')
             if args.command == 'sweep' and accounts:
                 await reader.login_and_enter(page, accounts[0])
+                account_browser.authenticated = True
+                await account_browser.save_session()
             else:
                 await reader.enter_game(page)
             if args.command == 'sweep':
@@ -748,7 +752,7 @@ async def run_browser(args, config, data, store, accounts=None):
         finally:
             for extra_browser in extra_browsers:
                 await extra_browser.close()
-            await browser.close()
+            await account_browser.close()
 
 
 def export_players(store, data):

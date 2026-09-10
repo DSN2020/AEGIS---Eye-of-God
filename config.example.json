@@ -42,7 +42,8 @@
     "efficient_slots": true,
     "detail_ocr": true,
     "render_fps": 20,
-    "rendered_text": true
+    "rendered_text": true,
+    "browser_mode": "isolated"
   },
   "ocr_confidence": 0.9,
   "monitor_seconds": 15,

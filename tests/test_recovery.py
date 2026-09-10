@@ -19,6 +19,15 @@ def line(text, x=150, y=300, confidence=.99):
 
 
 class PopupTests(unittest.IsolatedAsyncioTestCase):
+    async def test_shared_session_can_finish_loading_after_90_seconds(self):
+        reader = Reader.__new__(Reader)
+        reader.config = {'_shared_browser_endpoint': 'fixture'}
+        reader.observe = AsyncMock(return_value=(
+            [line('Planets'), line('Fleet'), line('Alliance')], b''))
+        with patch('ev_assistant.__main__.time.monotonic', side_effect=[0, 100]):
+            await reader.login_and_enter(Mock(), {'username': 'test'})
+        reader.observe.assert_awaited_once()
+
     async def test_invalid_username_or_password_tries_second_supplied_password(self):
         reader = Reader.__new__(Reader)
         login = ([line('Password'), line('Log in')], b'')

@@ -87,3 +87,18 @@ The completed production rollout confirmed all six workers using rendered text; 
 ## Ten account slots
 
 The desktop, bridge and supervisor now accept 1–10 configured agents. Each account has its own login fields and activity color. New fields and fresh-install templates contain no credentials. Whole-galaxy scheduling remains unchanged: with nine galaxies, at most nine agents can have simultaneous assignments; a tenth waits. Existing six-worker sessions need no restart just to install the new UI. Adding new accounts through Save & apply starts the updated supervisor from saved checkpoints.
+
+
+## Shared-browser mode — September 9
+
+The supervisor can own one headless Chrome server (`sweep.browser_mode: "shared"`). It launches the Node runtime and Playwright package bundled with the same Python Playwright installation, keeping protocol versions matched. The WebSocket binds only to 127.0.0.1; its random endpoint lives in ignored runtime files. Each Python worker creates its own browser context through the native Playwright connection. The existing per-planet clicks, two-read confirmation, alliance parsing, OCR fallback, receipts and previews are unchanged.
+
+Only the supervisor owns the host process. A failed or removed worker disconnects its client and releases its contexts without closing the shared Chrome instance. A host/browser failure closes affected workers and restarts their existing galaxy assignments from receipts, staggered by slot. Cookies and local storage are saved using DPAPI to account-specific hashed paths after login. Persistent browser profiles remain available for rollback. Set `sweep.browser_mode` back to `"isolated"` while paused and resume to restore separate browsers; changing browser mode while running takes effect at the next supervisor start.
+
+Status includes `browserMode`, `browserState` and `sharedBrowserPid`; Live overview describes the active mode. A shared Chrome instance still has renderer/helper subprocesses and does not remove the per-worker game or OCR workload. Nine galaxy assignments remain the maximum concurrency even with ten configured account slots.
+
+`python verify_shared_browser.py` uses a local fixture, with no game accounts, to check isolated cookies/local storage, encrypted session restoration, client close, forced worker termination with no orphan contexts, and browser-crash recovery. Existing worker-count/recovery and ownership-verification tests remain applicable.
+
+The live nine-account trial used exactly one Chrome root with separate contexts and confirmed new slots without resetting coverage. Only the first four accounts reached sustained scanning; later accounts remained on the game loading overlay and retried. Shared-session startup was extended from 90 to 240 seconds, below the 360-second worker watchdog, but the later sessions still did not reach scanning during the trial. A requested restart of agent 1 preserved the Chrome PID and the PIDs/progress of scanning agents 2–4. No graphics or network failures were reported during the bounded diagnostic observations; the underlying loading cause is unresolved.
+
+The operational setup and example configuration therefore retain `browser_mode: "isolated"`. Shared mode is opt-in and experimental. The separate-browser sample overlapped the ninth account's startup, and shared mode did not reach equivalent concurrency, so these observations do not establish a fair throughput or memory improvement. Private trial/status reports remain under ignored `data/`.

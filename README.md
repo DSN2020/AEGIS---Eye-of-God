@@ -7,7 +7,7 @@ Repository: [DSN2020/AEGIS---Eye-of-God](https://github.com/DSN2020/AEGIS---Eye-
 ## Features
 
 - WPF app with live worker status, game previews, and account management.
-- Python + Playwright with a separate Chrome profile for each worker.
+- Python + Playwright with separate browser profiles and an optional shared-Chrome mode.
 - RapidOCR reads the canvas. Every unverified slot is opened and checked before recording ownership.
 - Resumable coverage of nine galaxies, 499 systems each, and 21 slots per system. Unresolved slots remain queued for retry.
 - Player coordinates grouped by owner, newest observations first, with name search and alliance filtering.
@@ -55,6 +55,16 @@ The optional `EOG.exe --verify-ui` check requires populated local reference obse
 
 Fresh installations have ten blank username/password slots. Add your own accounts in Manage; there are no bundled accounts. Saved account names, encrypted passwords, browser sessions, and scan results stay in the local ignored files. Share this repository or a clean build, not your working folder with its local configuration and data.
 
-The `sweep.rendered_text` setting enables the faster detail reader (enabled in new configurations). Existing configurations can set it to `true` and restart workers individually; setting it to `false` restores OCR-only detail verification. Each account retains its isolated browser and saved login. Live previews and checkpoints continue working. Run `python verify_rendered_text.py` for offline browser checks; `python benchmark_efficiency.py rendered-text --account YOUR_ACCOUNT` benchmarks an explicitly selected idle account.
+The `sweep.rendered_text` setting enables the faster detail reader (enabled in new configurations). Existing configurations can set it to `true` and restart workers individually; setting it to `false` restores OCR-only detail verification. Each account retains its isolated session and saved login. Live previews and checkpoints continue working. Run `python verify_rendered_text.py` for offline browser checks; `python benchmark_efficiency.py rendered-text --account YOUR_ACCOUNT` benchmarks an explicitly selected idle account.
 
 EOG supports ten account slots. The current scheduler assigns a whole galaxy to each scanning agent, so up to nine can scan concurrently; an additional configured agent waits for an available assignment. New slots are blank and require your own credentials. Adding accounts through Save & apply restarts the supervisor from checkpoints and loads the updated limit.
+
+## Shared Chrome (experimental)
+
+Separate browsers remain the default. In a nine-account trial on September 9, one shared browser sustained four scanning agents while later accounts remained on the game's loading screen, including with a longer startup allowance. Separate browsers were restored from checkpoints. This is an observed trial result, not a universal four-account limit or a proven diagnosis of the game's loading problem.
+
+Set `sweep.browser_mode` to `"shared"` in your local `config.json`, then pause and resume the scan. One headless Chrome instance hosts a separate context for each account. Live overview reports the active browser mode. Chrome still uses renderer/helper processes; one browser does not mean one Task Manager process.
+
+Each worker remains an independent Python process. Restarting or removing an agent closes only that agent's context. If the shared browser crashes, the supervisor relaunches it and reconnects the workers from their saved receipts. Cookies and local storage are saved per account with Windows DPAPI under ignored `data/browser-sessions/`. The local Playwright endpoint is runtime-only and bound to loopback. It is not published with the source.
+
+To return to the original arrangement, pause, set `sweep.browser_mode` to `"isolated"`, and resume. Existing persistent profiles are retained. Browser mode changes require a supervisor restart; agent-count changes remain live. Run `python verify_shared_browser.py` for offline browser isolation, encrypted-session, individual-worker crash and shared-browser recovery checks. Sharing Chrome reduces duplicated browser infrastructure; game renderers and OCR workers still consume resources.

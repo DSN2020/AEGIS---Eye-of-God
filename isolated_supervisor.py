@@ -11,6 +11,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 from ev_assistant.limits import MAX_AGENTS
+from ev_assistant.shared_browser import SharedBrowserHost
 from ev_assistant.store import Store
 from ev_assistant.__main__ import export_players
 
@@ -280,6 +281,8 @@ def main():
     prepare_jobs(DATA, galaxies)
     pending = pending_galaxies(DATA, galaxies, end)
     slots = [Slot(index, config) for index in range(config['sweep']['workers'])]
+    browser_mode = config['sweep'].get('browser_mode', 'isolated')
+    host = SharedBrowserHost(ROOT, DATA) if browser_mode == 'shared' else None
     store = Store(DATA / 'observations.sqlite')
     atomic_json(DATA / 'supervisor-pids.json', {'pid': os.getpid(), 'started': stamp()})
     try:
@@ -288,6 +291,25 @@ def main():
                 LOG.info('STOP requested')
                 break
             requested = read_json(ROOT / 'config.json', config)
+            browser_ready = True
+            if host:
+                if not host.alive:
+                    # A server crash invalidates every context. Preserve each
+                    # assignment and restart from receipts after a new host is ready.
+                    for slot in slots:
+                        if slot.process is not None:
+                            slot.close()
+                            slot.restarts += 1
+                            slot.next_launch = time.monotonic() + slot.index * 12
+                            slot.state, slot.detail = 'starting', 'Waiting for shared Chrome'
+                browser_ready = host.ensure()
+                if browser_ready:
+                    requested['_shared_browser_endpoint'] = host.info['endpoint']
+                    for slot in slots:
+                        if slot.detail == 'Waiting for shared Chrome':
+                            slot.detail = 'Waiting for scheduled session restart'
+            else:
+                requested.pop('_shared_browser_endpoint', None)
             try:
                 reconcile_slots(slots, pending, requested)
                 config = requested
@@ -299,10 +321,11 @@ def main():
                 command_path.unlink(missing_ok=True)
                 index = command.get('index',0)-1
                 if command.get('action') == 'restart' and 0 <= index < len(slots):
-                    if slots[index].process is not None:
+                    if browser_ready and slots[index].process is not None:
                         slots[index].restart('Requested in EOG')
-            for slot in slots:
-                slot.service(pending, end)
+            if browser_ready:
+                for slot in slots:
+                    slot.service(pending, end)
             progress, holes = {}, []
             for galaxy in galaxies:
                 coverage = coverage_for(DATA, galaxy)
@@ -313,6 +336,9 @@ def main():
             complete = all(galaxy_done(DATA, galaxy, end) for galaxy in galaxies)
             atomic_json(DATA / 'sweep-status.json', {
                 'supervisorPid': os.getpid(), 'state': 'complete' if complete else 'running',
+                'browserMode': browser_mode,
+                'sharedBrowserPid': host.info.get('browserPid') if host else None,
+                'browserState': 'ready' if browser_ready else 'retrying',
                 'updated': stamp(), 'expectedWorkers': len(slots), 'liveWorkerResize': True,
                 'activeWorkers': sum(slot.state in ('active', 'retrying') and
                                      slot.process is not None for slot in slots),
@@ -337,6 +363,8 @@ def main():
     finally:
         for slot in slots:
             slot.close()
+        if host:
+            host.close()
         singleton.close()
 
 

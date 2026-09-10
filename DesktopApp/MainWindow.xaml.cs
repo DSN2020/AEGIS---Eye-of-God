@@ -100,6 +100,11 @@ public partial class MainWindow : Window
             AgentStat.Text=$"{N(status,"activeWorkers")} / {(state=="paused" ? requested : N(status,"expectedWorkers",requested))}";
             int starting=snapshot.GetProperty("workers").EnumerateArray().Count(w=>S(w,"state")=="starting");
             AgentNote.Text=B(status,"workerCountPending") ? $"Changing to {requested} agents…" : $"{starting} starting · {N(status,"retryingWorkers")} retrying · {state}";
+            BrowserNote.Text=S(status,"browserMode")=="shared"
+                ? (state=="paused" ? "Shared Chrome · scan paused" : S(status,"browserState")=="retrying"
+                    ? "Shared Chrome reconnecting · progress saved"
+                    : "One shared Chrome browser · separate account sessions")
+                : "Separate Chrome browser for each agent";
             int configured=N(snapshot.GetProperty("settings"),"workerCount",savedWorkerCount);
             if(!countTimer.IsEnabled && !busy && workerCount==savedWorkerCount) { workerCount=configured; UpdateCount(); }
             savedWorkerCount=configured;
