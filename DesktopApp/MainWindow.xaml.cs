@@ -274,14 +274,14 @@ public partial class MainWindow : Window
         HivesButton.IsEnabled=!hive;DirectoryButton.IsEnabled=hive;
     }
     private void ClearFilters(object s,RoutedEventArgs e) { PlayerSearch.Clear(); AllianceSearch.Clear(); }
-    private void CopyPlayer(object s,RoutedEventArgs e) { try {Clipboard.SetText(((Button)s).Tag?.ToString()??"");ShowMessage("Player copied in Discord format.");} catch(Exception){ShowMessage("The clipboard is busy. Try again.",true);} }
-    private void CopyMatching(object s,RoutedEventArgs e)
+    private async void CopyPlayer(object s,RoutedEventArgs e) { try {await ClipboardCopy.CopyTextAsync(this,((Button)s).Tag?.ToString()??"");ShowMessage("Player copied in Discord format.");} catch(Exception error){ShowMessage(ClipboardCopy.ErrorMessage(error),true);} }
+    private async void CopyMatching(object s,RoutedEventArgs e)
     {
         if(filteredPlayers.Count==0) { ShowMessage("No matching players to copy."); return; }
         try {
-            Clipboard.SetText(string.Join("\n\n",filteredPlayers.Select(p=>p.CopyText)));
+            await ClipboardCopy.CopyTextAsync(this,string.Join("\n\n",filteredPlayers.Select(p=>p.CopyText)));
             ShowMessage($"Copied {filteredPlayers.Count:N0} shown players in Discord format.");
-        } catch(Exception) { ShowMessage("The clipboard is busy. Try again.",true); }
+        } catch(Exception error) { ShowMessage(ClipboardCopy.ErrorMessage(error),true); }
     }
     private void WorkerSelected(object s,SelectionChangedEventArgs e) => UpdatePreview();
     private void UpdatePreview()

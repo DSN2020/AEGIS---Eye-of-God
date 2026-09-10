@@ -29,13 +29,14 @@ public partial class HiveView : UserControl
         Summary.Text=$"{shown.Count:N0} hives · {shown.Sum(h=>h.PlanetCount):N0} planets · {shown.SelectMany(h=>h.Members).Select(m=>m.Name).Distinct(StringComparer.OrdinalIgnoreCase).Count():N0} players";
         Empty.Visibility=shown.Count==0?Visibility.Visible:Visibility.Collapsed;CopyShown.IsEnabled=shown.Count>0;
     }
-    private void Copy(string value)
+    private async Task Copy(string value)
     {
-        try{Clipboard.SetText(value);Feedback.Text="Copied in Discord format.";}
-        catch(Exception){Feedback.Text="The clipboard is busy. Try again.";}
+        Feedback.Text="Copying…";
+        try{await ClipboardCopy.CopyTextAsync(Window.GetWindow(this),value);Feedback.Text="Copied in Discord format.";}
+        catch(Exception error){Feedback.Text=ClipboardCopy.ErrorMessage(error);}
     }
-    private void CopyHive(object sender,RoutedEventArgs e)=>Copy(((Button)sender).Tag?.ToString()??"");
-    private void CopyAll(object sender,RoutedEventArgs e){if(shown.Count>0)Copy(string.Join("\n\n",shown.Select(h=>h.CopyText)));}
+    private async void CopyHive(object sender,RoutedEventArgs e)=>await Copy(((Button)sender).Tag?.ToString()??"");
+    private async void CopyAll(object sender,RoutedEventArgs e){if(shown.Count>0)await Copy(string.Join("\n\n",shown.Select(h=>h.CopyText)));}
     public void Verify()
     {
         if((int)Minimum.SelectedItem!=8 || (int)Span.SelectedItem!=3)throw new Exception("Hive defaults changed");

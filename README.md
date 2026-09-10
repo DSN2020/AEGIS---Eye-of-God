@@ -83,3 +83,6 @@ Cards list the galaxy/system range, totals per system, each member's alliance, l
 Name and alliance filters find hives containing a member who matches both filters. All members of those hives remain visible for context. **Copy hive** and **Copy shown hives** copy exactly the displayed groups with compact Discord coordinate blocks. Detection updates with the directory and makes no additional game requests.
 
 Run `dotnet run --project tests/HiveChecks/HiveChecks.csproj -c Release` for clustering, filtering, boundaries, deduplication and copy-format checks. The desktop `--verify-ui` check also captures the Hive view.
+
+
+Copy buttons use a shared Unicode clipboard writer with brief asynchronous retries for clipboard contention. Other Windows failures report their error code instead of being labelled busy. The opt-in native integration check is `dotnet run --project tests/ClipboardChecks/ClipboardChecks.csproj -c Release -- --copy-saved-hive <private-player-snapshot.json>`; the file must contain the player array from the local bridge snapshot. This test temporarily changes the Windows clipboard and finishes by copying a saved hive. Never commit the snapshot.
