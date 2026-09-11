@@ -46,13 +46,15 @@ public partial class MainWindow
             new {id="preview3",account="Cassiopeia",timestamp=now-30,text="Scan paused. Confirmed slots and coordinates are saved."},
             new {id="preview4",account="Orion",timestamp=now-45,text="Session ready · continuing from the last saved checkpoint."}
         }),activityClock.Elapsed);
-        foreach(var page in new[]{(NavLive,"overview"),(NavAccounts,"accounts"),(NavPlayers,"players"),(NavActivity,"activity"),(NavAutomation,"automation")}) {
+        Browsers.VerifySessions(Path.Combine(output,"welcome.png"));
+        Browsers.Update(sampleNames,workers,"isolated",true);
+        foreach(var page in new[]{(NavLive,"overview"),(NavBrowsers,"browsers"),(NavAccounts,"accounts"),(NavPlayers,"players"),(NavActivity,"activity"),(NavAutomation,"automation")}) {
             ShowPage(page.Item1);await SavePreview(output,page.Item2);
         }
         ShowPage(NavPlayers);SetCoordinateView(true);await SavePreview(output,"hives");SetCoordinateView(false);
         ShowPage(NavAutomation);Automation.VerifyEditor();await SavePreview(output,"automation-plan");Automation.FinishVerification();
         Width=MinWidth;Height=MinHeight;
-        foreach(var page in new[]{(NavLive,"overview"),(NavAccounts,"accounts"),(NavAutomation,"automation")}) {
+        foreach(var page in new[]{(NavLive,"overview"),(NavBrowsers,"browsers"),(NavAccounts,"accounts"),(NavAutomation,"automation")}) {
             ShowPage(page.Item1);await SavePreview(output,page.Item2+"-compact");
             if(page.Item1==NavAccounts) {
                 var position=ApplyButton.TransformToAncestor(this).Transform(new Point());
@@ -70,7 +72,7 @@ public partial class MainWindow
         ToggleSidebar(this,new RoutedEventArgs());
         WindowState=WindowState.Maximized;await SavePreview(output,"overview-maximized");
         WindowState=WindowState.Normal;await SavePreview(output,"overview-restored");
-        await File.WriteAllTextAsync(Path.Combine(output,"design-review.json"),JsonSerializer.Serialize(new {passed=true,syntheticData=true,compactSaveVisible=true,tenthAccountReachable=true,pages=7,maximizeRestore=true,frame=nativeFrame?.VerifyAppearance()}));
+        await File.WriteAllTextAsync(Path.Combine(output,"design-review.json"),JsonSerializer.Serialize(new {passed=true,syntheticData=true,compactSaveVisible=true,tenthAccountReachable=true,pages=8,maximizeRestore=true,frame=nativeFrame?.VerifyAppearance()}));
     }
 
     private async Task SavePreview(string output,string name)

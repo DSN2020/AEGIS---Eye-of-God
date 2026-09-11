@@ -47,6 +47,8 @@ public partial class MainWindow : Window
         InitializeComponent(); SetCoordinateView(false); BuildAccountRows(); ActivityList.ItemsSource=activityRows;
         highlightTimer.Tick+=(_,_)=>ExpireActivityHighlights(activityClock.Elapsed);
         highlightTimer.Start();
+        Browsers.ManageAccounts=()=>ShowPage(NavAccounts);
+        Browsers.RestartSession=index=>Execute(new {command="restart_worker",index});
         StateChanged+=(_,_)=>UpdateWindowShape();
     }
 
@@ -162,6 +164,7 @@ public partial class MainWindow : Window
                 LastCompleted=S(w,"lastCompleted","—"),Restarts=N(w,"restarts"),FramePath=S(w,"framePath"),FrameUpdated=D(w,"frameUpdated") }).ToList();
             WorkerList.ItemsSource=workers; WorkerList.SelectedItem=workers.FirstOrDefault(w=>w.Id==selected) ?? workers.FirstOrDefault();
             UpdatePreview();
+            Browsers.Update(snapshot.GetProperty("settings").GetProperty("accounts").EnumerateArray().Take(configured).Select(a=>S(a,"username")).ToArray(),workers,S(status,"browserMode"),state=="running");
             var players=snapshot.GetProperty("players");
             string nextKey=players.GetRawText();
             if(playerKey!=nextKey) {
@@ -291,8 +294,9 @@ public partial class MainWindow : Window
         PlayersView.Visibility=selected==NavPlayers ? Visibility.Visible : Visibility.Collapsed;
         AccountsView.Visibility=selected==NavAccounts ? Visibility.Visible : Visibility.Collapsed;
         ActivityView.Visibility=selected==NavActivity ? Visibility.Visible : Visibility.Collapsed;
+        Browsers.Visibility=selected==NavBrowsers ? Visibility.Visible : Visibility.Collapsed;
         Automation.Visibility=selected==NavAutomation ? Visibility.Visible : Visibility.Collapsed;
-        foreach(var button in new[]{NavLive,NavPlayers,NavAccounts,NavActivity,NavAutomation}) button.Style=(Style)FindResource(button==selected ? "NavButtonActive" : "NavButton");
+        foreach(var button in new[]{NavLive,NavBrowsers,NavPlayers,NavAccounts,NavActivity,NavAutomation}) button.Style=(Style)FindResource(button==selected ? "NavButtonActive" : "NavButton");
     }
     private void FilterChanged(object s,TextChangedEventArgs e) { if(PlayerCards!=null) ApplyFilters(); }
     private void ApplyFilters()
