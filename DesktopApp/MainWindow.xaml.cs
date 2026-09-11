@@ -421,9 +421,15 @@ public partial class MainWindow : Window
         var snapshot=await Request(new {command="snapshot"});
         if(N(snapshot,"playerCount")!=0 || B(snapshot.GetProperty("settings"),"running"))
             throw new InvalidOperationException("Fresh installation is not empty and paused.");
+        var automation=await Request(new {command="automation_snapshot"});
+        if(automation.GetProperty("profiles").GetArrayLength()!=0)
+            throw new InvalidOperationException("Fresh installation contains automation profiles.");
         string output=Environment.GetEnvironmentVariable("EOG_TEST_OUTPUT") ?? Path.Combine(root,"ui-review");
         Directory.CreateDirectory(output);
         await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle); UpdateLayout();
+        var savePosition=ApplyButton.TransformToAncestor(this).Transform(new Point(0,0));
+        if(savePosition.Y<0 || savePosition.Y+ApplyButton.ActualHeight>ActualHeight)
+            throw new InvalidOperationException("Save & apply must be visible without scrolling.");
         var bitmap=new RenderTargetBitmap((int)ActualWidth,(int)ActualHeight,96,96,PixelFormats.Pbgra32);
         bitmap.Render(this);
         var encoder=new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
