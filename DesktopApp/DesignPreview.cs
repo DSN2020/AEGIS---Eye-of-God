@@ -78,6 +78,11 @@ public partial class MainWindow
         await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle);UpdateLayout();
         var bitmap=new RenderTargetBitmap((int)ActualWidth,(int)ActualHeight,96,96,PixelFormats.Pbgra32);
         bitmap.Render(this);
+        foreach(var corner in new[]{new Int32Rect(0,0,1,1),new Int32Rect(bitmap.PixelWidth-1,0,1,1),new Int32Rect(0,bitmap.PixelHeight-1,1,1),new Int32Rect(bitmap.PixelWidth-1,bitmap.PixelHeight-1,1,1)}) {
+            byte[] pixel=new byte[4];bitmap.CopyPixels(corner,pixel,4,0);
+            if(pixel.Take(3).Any(channel=>channel>110))
+                throw new InvalidOperationException($"A light backing surface is visible at a window corner in {name}.");
+        }
         var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(bitmap));
         using var file=File.Create(Path.Combine(output,name+".png"));encoder.Save(file);
     }
