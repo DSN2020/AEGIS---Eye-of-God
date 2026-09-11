@@ -9,6 +9,7 @@ import time
 from pathlib import Path
 from .model import validate, preset, timestamp
 from .storage import atomic_json, read_json
+from ev_assistant.runtime import APP_ROOT, child_environment
 
 def account_key(account):
     return hashlib.sha256(account.strip().casefold().encode()).hexdigest()[:24]
@@ -93,7 +94,7 @@ class Service:
         atomic_json(path/'status.json',{'state':'starting','message':'Waiting for the account handoff','updated':time.time()})
         try:
             with (path/'worker.log').open('a',encoding='utf-8') as out:
-                subprocess.Popen([sys.executable,'-u','-m','eog_automation.worker','--profile',p['id']],cwd=self.root,
+                subprocess.Popen([sys.executable,'-u','-m','eog_automation.worker','--profile',p['id']],cwd=APP_ROOT,env=child_environment(self.root),
                     stdout=out,stderr=out,creationflags=subprocess.CREATE_NO_WINDOW if os.name=='nt' else 0)
         except Exception:
             claim.unlink(missing_ok=True);raise RuntimeError('Could not start automation worker')

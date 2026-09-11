@@ -39,6 +39,7 @@ public partial class MainWindow : Window
     private string root = "", frameKey = "", playerKey = "";
     private DateTime messageUntil = DateTime.MinValue;
     private readonly bool verifyUi = Environment.GetCommandLineArgs().Contains("--verify-ui");
+    private readonly bool smokeTest = Environment.GetCommandLineArgs().Contains("--smoke-test");
 
     public MainWindow() {
         InitializeComponent(); SetCoordinateView(false); BuildAccountRows(); ActivityList.ItemsSource=activityRows;
@@ -56,20 +57,33 @@ public partial class MainWindow : Window
     private async void Window_Loaded(object sender,RoutedEventArgs e)
     {
         try {
-            var directory = new DirectoryInfo(AppContext.BaseDirectory);
-            while(directory!=null && !File.Exists(Path.Combine(directory.FullName,"app_bridge.py"))) directory=directory.Parent;
-            root=directory?.FullName ?? throw new InvalidOperationException("Keep EOG inside its scanner folder. The scanner files could not be found.");
-            var runtime=JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(root,"desktop-runtime.json"))).RootElement;
-            var info=new ProcessStartInfo(S(runtime,"pythonPath")) { WorkingDirectory=root,UseShellExecute=false,CreateNoWindow=true,RedirectStandardInput=true,RedirectStandardOutput=true,RedirectStandardError=true,StandardInputEncoding=new UTF8Encoding(false),StandardOutputEncoding=Encoding.UTF8 };
-            info.ArgumentList.Add("-u"); info.ArgumentList.Add("app_bridge.py");
+            var runtime=RuntimeSetup.Prepare(AppContext.BaseDirectory);
+            root=runtime.DataRoot;
+            var info=runtime.BridgeProcess();
             bridge=Process.Start(info) ?? throw new InvalidOperationException("Could not start the scanner connection.");
             _=bridge.StandardError.ReadToEndAsync();
             LoadSettings(await Request(new { command="settings" }));
             Automation.Request=Request; await Automation.Poll();
             await RefreshSnapshot();
+            if(savedNames.Count==0) {
+                ShowPage(NavAccounts);
+                WelcomeCard.Visibility=Visibility.Visible;
+                usernames[0].Focus();
+                ShowMessage("Welcome to EOG. Add your game account, select Save & apply, then Resume scan.");
+            }
+            if(smokeTest) { await VerifyFreshInstall(); Close(); return; }
             if(verifyUi) { await VerifyAndCapture(); Close(); return; }
             timer.Tick+=async (_,_) => await RefreshSnapshot(); timer.Start();
-        } catch(Exception ex) { ShowMessage(ex.Message,true); if(verifyUi) { await File.WriteAllTextAsync(Path.Combine(AppContext.BaseDirectory,"ui-error.txt"),ex.ToString()); Application.Current.Shutdown(1); } }
+        } catch(Exception ex) {
+            ShowMessage(ex.Message,true);
+            ResumeButton.IsEnabled=PauseButton.IsEnabled=ApplyButton.IsEnabled=false;
+            if(verifyUi || smokeTest) {
+                string output=Environment.GetEnvironmentVariable("EOG_TEST_OUTPUT") ?? AppContext.BaseDirectory;
+                Directory.CreateDirectory(output);
+                await File.WriteAllTextAsync(Path.Combine(output,"ui-error.txt"),ex.ToString());
+                Application.Current.Shutdown(1);
+            } else MessageBox.Show(this,ex.Message,"EOG could not open",MessageBoxButton.OK,MessageBoxImage.Error);
+        }
     }
 
     private async Task<JsonElement> Request(object request)
@@ -96,7 +110,7 @@ public partial class MainWindow : Window
             var status=snapshot.GetProperty("status");
             string state=S(status,"state","paused");
             RunBadge.Text=state.ToUpperInvariant(); RunBadge.Foreground=new SolidColorBrush(state=="running" ? Color.FromRgb(85,214,160) : Color.FromRgb(230,180,80));
-            ResumeButton.IsEnabled=state is not ("running" or "unresponsive"); PauseButton.IsEnabled=state is "running" or "unresponsive";
+            ResumeButton.IsEnabled=state is not ("running" or "unresponsive") && savedNames.Count>0; PauseButton.IsEnabled=state is "running" or "unresponsive";
             int requested=N(status,"requestedWorkers",workerCount);
             AgentStat.Text=$"{N(status,"activeWorkers")} / {(state=="paused" ? requested : N(status,"expectedWorkers",requested))}";
             int starting=snapshot.GetProperty("workers").EnumerateArray().Count(w=>S(w,"state")=="starting");
@@ -194,6 +208,7 @@ public partial class MainWindow : Window
         savedWorkerCount=workerCount;
         var accounts=settings.GetProperty("accounts").EnumerateArray().ToArray();
         savedNames.Clear(); foreach(var a in accounts) if(B(a,"hasPassword")) savedNames.Add(S(a,"username"));
+        WelcomeCard.Visibility=savedNames.Count==0 ? Visibility.Visible : Visibility.Collapsed;
         for(int i=0;i<MaxAgents;i++) {
             usernames[i].Text=i<accounts.Length ? S(accounts[i],"username") : ""; passwords[i].Clear();
             credentialLabels[i].Text=i<accounts.Length && B(accounts[i],"hasPassword") ? "Saved securely" : "Not saved";
@@ -205,7 +220,7 @@ public partial class MainWindow : Window
         int next=Math.Clamp(workerCount+delta,1,MaxAgents);
         if(next==workerCount) return;
         workerCount=next; UpdateCount();
-        if(verifyUi) return; // UI verification never changes scanner settings.
+        if(verifyUi || smokeTest) return; // UI verification never changes scanner settings.
         CountChangeStatus.Text=$"Applying {workerCount} agents using saved accounts…";
         CountChangeStatus.Foreground=(Brush)FindResource("SubTextBrush");
         countTimer.Stop(); countTimer.Start();
@@ -387,7 +402,7 @@ public partial class MainWindow : Window
         var planEncoder=new PngBitmapEncoder();planEncoder.Frames.Add(BitmapFrame.Create(planBitmap));
         using(var planFile=File.Create(Path.Combine(output,"automation-plan.png"))) planEncoder.Save(planFile);
         Automation.FinishVerification();
-        ShowPage(NavAccounts); AccountsView.ScrollToEnd();
+        ShowPage(NavAccounts); AccountsScroll.ScrollToEnd();
         await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle); UpdateLayout();
         var lastFieldPosition=usernames[^1].TransformToAncestor(this).Transform(new Point(0,0));
         if(lastFieldPosition.Y<0 || lastFieldPosition.Y+usernames[^1].ActualHeight>ActualHeight) throw new Exception("Tenth account field cannot be reached");
@@ -395,6 +410,34 @@ public partial class MainWindow : Window
         var bottomEncoder=new PngBitmapEncoder();bottomEncoder.Frames.Add(BitmapFrame.Create(bottomBitmap));
         using(var bottomFile=File.Create(Path.Combine(output,"accounts-bottom.png"))) bottomEncoder.Save(bottomFile);
         await File.WriteAllTextAsync(Path.Combine(output,"verification.json"),JsonSerializer.Serialize(new {passed=true,hiveView=true,automationEditor=true,blankAccountSlots=true,accountSlots=MaxAgents,tenAccountRequest=true,tenAccountColors=true,search=true,allianceFilter=true,agentBounds=true,activityChronology=true,accountColors=true,oneSecondFade=true,grayAfterFade=true,noRepeatFlash=true,playerRecency=true,players=allPlayers.Count,workers=workers.Count}));
+    }
+
+    private async Task VerifyFreshInstall()
+    {
+        if(string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("EOG_DATA_ROOT")))
+            throw new InvalidOperationException("Smoke checks require an isolated EOG_DATA_ROOT.");
+        if(savedNames.Count!=0 || workerCount!=1 || usernames.Any(n=>n.Text.Length!=0))
+            throw new InvalidOperationException("Fresh installation did not start with one blank account.");
+        var snapshot=await Request(new {command="snapshot"});
+        if(N(snapshot,"playerCount")!=0 || B(snapshot.GetProperty("settings"),"running"))
+            throw new InvalidOperationException("Fresh installation is not empty and paused.");
+        var automation=await Request(new {command="automation_snapshot"});
+        if(automation.GetProperty("profiles").GetArrayLength()!=0)
+            throw new InvalidOperationException("Fresh installation contains automation profiles.");
+        string output=Environment.GetEnvironmentVariable("EOG_TEST_OUTPUT") ?? Path.Combine(root,"ui-review");
+        Directory.CreateDirectory(output);
+        await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle); UpdateLayout();
+        var savePosition=ApplyButton.TransformToAncestor(this).Transform(new Point(0,0));
+        if(savePosition.Y<0 || savePosition.Y+ApplyButton.ActualHeight>ActualHeight)
+            throw new InvalidOperationException("Save & apply must be visible without scrolling.");
+        var bitmap=new RenderTargetBitmap((int)ActualWidth,(int)ActualHeight,96,96,PixelFormats.Pbgra32);
+        bitmap.Render(this);
+        var encoder=new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
+        using(var file=File.Create(Path.Combine(output,"first-run.png"))) encoder.Save(file);
+        await File.WriteAllTextAsync(Path.Combine(output,"smoke-test.json"),JsonSerializer.Serialize(new {
+            passed=true,blankAccounts=true,paused=true,bridgeConnected=true,automationConnected=true,
+            accountsPage=AccountsView.Visibility==Visibility.Visible
+        }));
     }
 }
 

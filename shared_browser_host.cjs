@@ -16,7 +16,7 @@ process.on('SIGTERM', stop);
 process.on('SIGINT', stop);
 (async () => {
   server = await chromium.launchServer({host: '127.0.0.1', port: 0,
-    headless: true, executablePath: process.argv[4]});
+    headless: true, ...(process.argv[4] ? {channel: process.argv[4]} : {})});
   if (stopping) { await server.close(); return; }
   server.on('close', () => process.exit(stopping ? 0 : 1));
   fs.writeFileSync(statePath + '.tmp', JSON.stringify({

@@ -1,0 +1,21 @@
+EOG includes third-party runtimes and dependencies.
+
+Python: Python Software Foundation license, runtime/python/LICENSE.txt.
+https://www.python.org/psf/license/
+Runtime distribution: https://github.com/astral-sh/python-build-standalone
+
+.NET: MIT license; LICENSE.txt and THIRD-PARTY-NOTICES.txt supplied by the
+.NET publish output. https://github.com/dotnet/runtime
+
+Chromium and Playwright: licenses and notices supplied under runtime/browsers
+and runtime/python/Lib/site-packages/playwright. https://playwright.dev/
+
+Python dependencies: python-packages.txt lists every installed distribution.
+License files and metadata are included in each distribution's .dist-info
+directory under runtime/python/Lib/site-packages.
+
+Microsoft Visual C++ runtime DLLs are distributed alongside Python under the
+Visual Studio redistributable code terms. These are the Microsoft-supplied
+files from the build toolchain's x64 Microsoft.VC*.CRT directory.
+
+Retain these license files when redistributing this package.

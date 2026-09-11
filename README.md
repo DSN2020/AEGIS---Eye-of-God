@@ -4,6 +4,23 @@ Windows desktop control panel and coordinate scanner for [Eternal Void](https://
 
 Repository: [DSN2020/AEGIS---Eye-of-God](https://github.com/DSN2020/AEGIS---Eye-of-God).
 
+## Download for Windows
+
+**[Download EOG for Windows](https://github.com/DSN2020/AEGIS---Eye-of-God/releases/latest)**
+
+1. Under **Assets**, download **EOG-<version>-windows-x64.zip**.
+2. Right-click the ZIP and select **Extract All**.
+3. Open the extracted folder and double-click **EOG.exe**.
+4. Enter your Eternal Void account, select **Save & apply**, then **Resume scan**.
+
+The download includes Python, .NET, Chromium and OCR. No developer tools, commands or administrator access are required. Supports 64-bit Windows 10/11 on Intel/AMD PCs. Scanning requires internet access and your own game account. macOS, Linux and native ARM builds are not included.
+
+**GitHub's Code → Download ZIP downloads the source code.** Use the Windows asset on the release page to run the app. If you already downloaded the source folder, double-click **Download EOG.cmd** to open the correct download page.
+
+Settings and results are stored separately in `%LOCALAPPDATA%\EOG`. To update, pause scans and any Upgrade bot profiles, close EOG, and extract the new download into a new folder. Your accounts and progress remain available. Source installations keep their original local data and are not automatically migrated. Closing EOG leaves scans running; use **Pause scan** to stop them.
+
+Current downloads are unsigned, so Windows may show an unknown-publisher warning. See the release notes for the checks performed for that build.
+
 ## Features
 
 - WPF app with live worker status, game previews, and account management.
@@ -16,7 +33,7 @@ Repository: [DSN2020/AEGIS---Eye-of-God](https://github.com/DSN2020/AEGIS---Eye-
 - Reads displayed planet-detail text directly from the game renderer, with automatic OCR fallback. Every planet is still opened and confirmed.
 - Local Windows DPAPI protection for saved passwords.
 
-## Windows setup
+## Developer setup from source
 
 Install Python 3.10, Google Chrome at its standard Windows location, and the .NET 8 SDK. From this folder:
 
@@ -27,6 +44,8 @@ dotnet publish DesktopApp/EyeOfGod.csproj -c Release -o DesktopApp/publish
 ```
 
 Setup creates a virtual environment, copies `config.example.json` to `config.json` if absent, and writes the local Python path to `desktop-runtime.json` if absent. Existing configuration files are preserved.
+
+To build a distributable Windows download, see [packaging instructions](packaging/README.md). Publishing only `EOG.exe` from the source build does not include the scanner runtime.
 
 In **Agents & accounts**, enter your accounts and select **Save & apply**, then use **Resume scan**. Count changes apply automatically using saved account details; username/password edits require Save & apply. Additional workers share the computer's resources and may not increase throughput.
 

@@ -20,7 +20,9 @@ from .coverage import sweep_positions
 from .vision import (OCR, TextLine, UncertainScreen, read_owner, compact,
                      popup_kind, map_header_readable, join_rows)
 
-ROOT = Path(__file__).resolve().parent.parent
+from .runtime import user_root, browser_options
+
+ROOT = user_root()
 LOG = logging.getLogger('eternal-void')
 
 
@@ -583,13 +585,11 @@ async def run_browser(args, config, data, store, accounts=None):
                     browser_names = sweep.get('worker_browsers', [])
                     browser_name = (browser_names[worker_index]
                                     if worker_index < len(browser_names) else 'chrome')
-                    executable = r'C:\Program Files\Google\Chrome\Application\chrome.exe'
                     if browser_name == 'edge':
-                        executable = r'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
                         profile_name += '-edge'
                     worker_browser = await playwright.chromium.launch_persistent_context(
                         str(data / profile_name), headless=True,
-                        executable_path=executable,
+                        **browser_options('msedge' if browser_name == 'edge' else 'chrome'),
                         viewport=config['viewport'], device_scale_factor=1)
                     extra_browsers.append(worker_browser)
                     from .performance import install_frame_limit

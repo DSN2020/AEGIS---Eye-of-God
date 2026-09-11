@@ -2,6 +2,8 @@
 
 Windows desktop control panel for the Eternal Void scanner. Its WPF theme is adapted from the user's Anispo Control Panel: charcoal panels, red accents, rounded controls, and sidebar navigation.
 
+For normal use, [download the Windows release](https://github.com/DSN2020/AEGIS---Eye-of-God/releases/latest), extract the whole ZIP and open its top-level `EOG.exe`. Everything needed to launch is included. The welcome screen guides account setup, and settings live in `%LOCALAPPDATA%\EOG`. The build instructions below apply to development from source.
+
 Open `publish/EOG.exe` or the **EOG** desktop shortcut. Keep the executable in this folder structure; it connects to the scanner's existing Python environment through `desktop-runtime.json` in the scanner root. Closing EOG leaves the scanner running. **Pause scan** stops scanner agents and preserves every saved confirmation; **Resume scan** continues from checkpoints.
 
 - **Live overview:** account-level status, verified slot and system totals, found players, and a selected agent's game screenshot. Coverage counts only the required positions (5–20 by default), with skipped positions listed below the agents. Existing findings remain available. Status refreshes every two seconds; screenshots are captured during scanning about every five seconds. No login screenshots are used for this view. Restart selected affects only the selected agent.

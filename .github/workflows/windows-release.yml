@@ -1,0 +1,84 @@
+name: Windows download
+
+on:
+  pull_request:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Package version (for example 0.1.0)'
+        required: true
+        default: '0.1.0'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Select version
+        id: version
+        shell: pwsh
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          $version = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME.Substring(1) } elseif ($env:INPUT_VERSION) { $env:INPUT_VERSION } else { '0.0.0-ci.' + $env:GITHUB_RUN_NUMBER }
+          if ($version -notmatch '^\d+\.\d+\.\d+([-.][A-Za-z0-9.]+)?$') { throw 'Invalid version' }
+          "version=$version" >> $env:GITHUB_OUTPUT
+      - name: Build and check complete Windows download
+        shell: pwsh
+        env:
+          PACKAGE_VERSION: ${{ steps.version.outputs.version }}
+        run: ./packaging/Build-Windows.ps1 -Version $env:PACKAGE_VERSION
+      - name: Regression checks
+        shell: pwsh
+        env:
+          PACKAGE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          & "./dist/EOG-$env:PACKAGE_VERSION-windows-x64/runtime/python/python.exe" -c 'import sys, unittest; from pathlib import Path; sys.path.insert(0, str(Path.cwd())); result=unittest.TextTestRunner().run(unittest.defaultTestLoader.discover("tests")); sys.exit(not result.wasSuccessful())'
+          if ($LASTEXITCODE -ne 0) { throw 'Python tests failed' }
+          dotnet run --project tests/RuntimeChecks/RuntimeChecks.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { throw 'Runtime checks failed' }
+          dotnet run --project tests/HiveChecks/HiveChecks.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { throw 'Hive checks failed' }
+          dotnet build tests/ClipboardChecks/ClipboardChecks.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { throw 'Clipboard check project failed to build' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: EOG-windows-x64
+          path: |
+            dist/*.zip
+            dist/*.sha256
+          compression-level: 0
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Windows-startup-checks
+          path: .build/check-*/
+          include-hidden-files: true
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: EOG-windows-x64
+          path: dist
+      - name: Publish Windows download
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/*.zip dist/*.sha256 --verify-tag --title "EOG $GITHUB_REF_NAME for Windows" --notes-file packaging/RELEASE-NOTES.md

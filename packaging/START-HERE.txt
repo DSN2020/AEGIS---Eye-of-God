@@ -1,0 +1,26 @@
+EOG - Eye of God for Windows
+
+1. Extract the entire ZIP (right-click it and select Extract All).
+2. Open the extracted folder and double-click EOG.exe.
+3. Enter your Eternal Void account, select Save & apply, then Resume scan.
+
+No Python, .NET SDK, Chrome installation, terminal or administrator access needed.
+This build is for 64-bit Windows 10/11 on Intel or AMD PCs.
+An internet connection and your own Eternal Void account are needed to scan.
+
+Keep EOG.exe together with all the other files in this folder.
+You can right-click EOG.exe and create a shortcut for easier access.
+
+Settings and scan progress are stored in %LOCALAPPDATA%\EOG, separately from
+this download. Passwords are encrypted for your Windows account. To update,
+pause scans and upgrade profiles, close EOG, and extract the new release into
+a new folder. Open its EOG.exe; your existing settings and results remain.
+
+Closing EOG leaves scans running. Select Pause scan to stop them. Pause any
+running Upgrade bot profiles separately before updating or removing the app.
+
+To remove EOG, stop scans and upgrade profiles, close EOG, and delete the
+extracted program folder. Your saved data remains in %LOCALAPPDATA%\EOG.
+
+Download updates and report problems:
+https://github.com/DSN2020/AEGIS---Eye-of-God/releases
