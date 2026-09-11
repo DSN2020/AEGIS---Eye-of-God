@@ -149,71 +149,8 @@ class Reader:
         raise UncertainScreen('Timed out while entering the saved game session')
 
     async def login_and_enter(self, page, account):
-        """Enter one explicitly supplied account without logging its password."""
-        passwords = account.get('passwords') or [account.get('password', '')]
-        password_index = 0
-        last_diagnostic = 0
-        # Fresh isolated contexts may load game assets concurrently. Keep the
-        # allowance below the supervisor's 360-second startup watchdog.
-        shared = getattr(self, 'config', {}).get('_shared_browser_endpoint')
-        deadline = time.monotonic() + (240 if shared else 90)
-        while time.monotonic() < deadline:
-            lines, entry_image = await self.observe(page)
-            text = '\n'.join(x.text for x in lines if x.confidence >= 0.75)
-            lowered = text.lower()
-            if re.search(r'auth.*fail|invalid.*(?:credential|username|password)|incorrect.*password', lowered):
-                password_index += 1
-                if password_index >= len(passwords):
-                    raise UncertainScreen(f'Login failed for {account["username"]}')
-                await page.mouse.click(235, 565)
-                await asyncio.sleep(.5)
-                continue
-            if 'all fields are required' in lowered:
-                await page.mouse.click(235, 565)
-                await asyncio.sleep(.5)
-                continue
-            if 'planets' in lowered and 'fleet' in lowered and 'alliance' in lowered:
-                return
-            if 'tap anywhere to continue' in lowered or ('enter' in lowered and 'updates' in lowered):
-                await page.mouse.click(235, 566)
-                await asyncio.sleep(1)
-                continue
-            if 'start' in lowered and ('email' in lowered or 'orion' in lowered):
-                await page.mouse.click(235, 777)
-                await asyncio.sleep(2)
-                continue
-            if 'password' in lowered and ('log in' in lowered or 'login' in lowered):
-                if not passwords[password_index]:
-                    raise UncertainScreen(
-                        f'Saved login expired for {account["username"]}; no password available')
-                inputs = page.locator('input:visible')
-                count = await inputs.count()
-                identifier = None
-                password = None
-                for index in range(count):
-                    field = inputs.nth(index)
-                    if await field.is_disabled():
-                        continue
-                    field_type = (await field.get_attribute('type') or 'text').lower()
-                    if field_type == 'password' and password is None:
-                        password = field
-                    elif field_type != 'password' and identifier is None:
-                        identifier = field
-                if identifier is None or password is None:
-                    raise UncertainScreen('Login fields were ambiguous')
-                await identifier.fill(account['username'])
-                await password.fill(passwords[password_index])
-                button = page.get_by_role('button', name='LOG IN', exact=True)
-                await button.click()
-                await asyncio.sleep(3)
-                continue
-            if 'password' not in lowered and time.monotonic() - last_diagnostic >= 10:
-                (self.data / 'entry-unrecognized.png').write_bytes(entry_image)
-                last_diagnostic = time.monotonic()
-            await asyncio.sleep(1)
-        await page.screenshot(path=str(self.data / 'entry-timeout.png'),
-                              mask=[page.locator('input[type="password"]')])
-        raise UncertainScreen(f'Timed out entering account {account["username"]}')
+        from .login import login_and_enter
+        await login_and_enter(self, page, account)
 
     async def set_coordinate(self, page, x, value):
         self.check_stop()

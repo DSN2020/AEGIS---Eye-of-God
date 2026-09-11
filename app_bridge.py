@@ -28,6 +28,7 @@ def recent_activity(path, account):
             handle.readline()  # Never expose a cut-off first line.
         lines = handle.read().decode('utf-8', errors='replace').splitlines()
     events = []
+    current_account = 'Earlier session' if any('START account=' in line for line in lines) else account
     for line in lines:
         match = re.match(r'^(\d{4}-\d\d-\d\d[ T]\d\d:\d\d:\d\d(?:[.,]\d+)?(?:[+-]\d\d:\d\d)?)\s+(.*)', line)
         if match:
@@ -35,11 +36,14 @@ def recent_activity(path, account):
                 timestamp = datetime.fromisoformat(match[1].replace(',', '.')).timestamp()
             except ValueError:
                 continue
-            events.append({'account':account, 'timestamp':timestamp, 'text':match[2]})
+            start = re.match(r'START account=(.*?) galaxy=\d+', match[2])
+            if start:
+                current_account = start[1]
+            events.append({'account':current_account, 'timestamp':timestamp, 'text':match[2]})
         elif line.strip() and events:
             events[-1]['text'] += '\n' + line
     for event in events:
-        identity = f"{account}\0{event['timestamp']}\0{event['text']}"
+        identity = f"{event['account']}\0{event['timestamp']}\0{event['text']}"
         event['id'] = hashlib.sha256(identity.encode('utf-8')).hexdigest()
     return events[-22:]
 
@@ -95,8 +99,9 @@ class ApplicationBridge:
         if not count <= len(accounts) <= MAX_AGENTS:
             raise ValueError('Add one account for every active agent.')
         names = [str(a.get('username','')).strip() for a in accounts]
-        if any(not name for name in names[:count]):
-            raise ValueError('Every active agent needs a username.')
+        for index, name in enumerate(names[:count]):
+            if not name:
+                raise ValueError(f'Enter a login username for Agent {index+1}, or reduce the agent count.')
         nonempty = [n.casefold() for n in names if n]
         if len(nonempty) != len(set(nonempty)):
             raise ValueError('Use a different account for each agent.')

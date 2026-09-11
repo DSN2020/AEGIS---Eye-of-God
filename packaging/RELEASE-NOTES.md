@@ -1,5 +1,7 @@
 Download the **EOG Windows ZIP** from **Assets** below. Its filename ends in **windows-x64.zip**.
 
+This update fixes fresh-account startup: EOG selects the game's current Enter and Log in controls, ignores hidden/offscreen registration fields, and accepts usernames or email addresses. Account edits and the agent count now save together; unsaved edits are clearly marked. Login failures wait for a correction or Restart selected instead of retrying endlessly. Activity keeps each older session's original account label.
+
 1. Right-click the ZIP and choose **Extract All**.
 2. Open the extracted folder and double-click **EOG.exe**.
 3. Enter your Eternal Void account, select **Save & apply**, then **Resume scan**.

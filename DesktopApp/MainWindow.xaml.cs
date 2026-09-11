@@ -19,7 +19,6 @@ public partial class MainWindow : Window
     private readonly SemaphoreSlim bridgeLock = new(1,1);
     private readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromSeconds(2) };
     private readonly DispatcherTimer highlightTimer = new() { Interval = TimeSpan.FromMilliseconds(50) };
-    private readonly DispatcherTimer countTimer = new() { Interval = TimeSpan.FromMilliseconds(650) };
     private readonly Stopwatch activityClock = Stopwatch.StartNew();
     private readonly ObservableCollection<ActivityEntry> activityRows = [];
     private readonly HashSet<string> seenActivity = [];
@@ -31,6 +30,8 @@ public partial class MainWindow : Window
     private readonly List<TextBlock> credentialLabels = [];
     private readonly List<TextBlock> slotLabels = [];
     private readonly HashSet<string> savedNames = new(StringComparer.OrdinalIgnoreCase);
+    private string[] savedAccountNames = Enumerable.Repeat("",MaxAgents).ToArray();
+    private bool loadingSettings, accountEditsPending;
     private List<PlayerEntry> allPlayers = [];
     private List<PlayerEntry> filteredPlayers = [];
     private List<WorkerEntry> workers = [];
@@ -45,7 +46,6 @@ public partial class MainWindow : Window
         InitializeComponent(); SetCoordinateView(false); BuildAccountRows(); ActivityList.ItemsSource=activityRows;
         highlightTimer.Tick+=(_,_)=>ExpireActivityHighlights(activityClock.Elapsed);
         highlightTimer.Start();
-        countTimer.Tick+=async (_,_)=> { countTimer.Stop(); await ApplyCountChange(); };
     }
 
     private static string S(JsonElement e,string key,string fallback="") => e.ValueKind==JsonValueKind.Object && e.TryGetProperty(key,out var v) && v.ValueKind!=JsonValueKind.Null ? v.ToString() : fallback;
@@ -110,7 +110,7 @@ public partial class MainWindow : Window
             var status=snapshot.GetProperty("status");
             string state=S(status,"state","paused");
             RunBadge.Text=state.ToUpperInvariant(); RunBadge.Foreground=new SolidColorBrush(state=="running" ? Color.FromRgb(85,214,160) : Color.FromRgb(230,180,80));
-            ResumeButton.IsEnabled=state is not ("running" or "unresponsive") && savedNames.Count>0; PauseButton.IsEnabled=state is "running" or "unresponsive";
+            ResumeButton.IsEnabled=state is not ("running" or "unresponsive") && savedNames.Count>0 && !accountEditsPending; PauseButton.IsEnabled=state is "running" or "unresponsive";
             int requested=N(status,"requestedWorkers",workerCount);
             AgentStat.Text=$"{N(status,"activeWorkers")} / {(state=="paused" ? requested : N(status,"expectedWorkers",requested))}";
             int starting=snapshot.GetProperty("workers").EnumerateArray().Count(w=>S(w,"state")=="starting");
@@ -121,10 +121,9 @@ public partial class MainWindow : Window
                     : "One shared Chrome browser · separate account sessions")
                 : "Separate Chrome browser for each agent";
             int configured=N(snapshot.GetProperty("settings"),"workerCount",savedWorkerCount);
-            if(!countTimer.IsEnabled && !busy && workerCount==savedWorkerCount) { workerCount=configured; UpdateCount(); }
-            savedWorkerCount=configured;
-            if(!countTimer.IsEnabled && !busy && workerCount==configured) {
-                CountChangeStatus.Text=B(status,"workerCountPending") ? $"Applying {configured} agents using saved accounts…" : state=="paused" ? $"{configured} agents selected. Resume scan to start them." : $"{configured} agent slots applied · {N(status,"activeWorkers")} scanning. Account edits still use Save & apply.";
+            if(!accountEditsPending && !busy) {
+                LoadSettings(snapshot.GetProperty("settings"));
+                CountChangeStatus.Text=B(status,"workerCountPending") ? $"Applying {configured} saved accounts…" : $"{configured} agents saved · {N(status,"activeWorkers")} scanning. Changes take effect with Save & apply.";
                 CountChangeStatus.Foreground=(Brush)FindResource("SubTextBrush");
             }
             SlotStat.Text=N(status,"verifiedPlanetSlots").ToString("N0");
@@ -199,14 +198,19 @@ public partial class MainWindow : Window
             var saved=new TextBlock {Text="Not saved",Foreground=(Brush)FindResource("SubTextBrush"),VerticalAlignment=VerticalAlignment.Center,FontSize=11}; Grid.SetColumn(saved,3); grid.Children.Add(saved); credentialLabels.Add(saved);
             name.TextChanged+=(_,_)=>saved.Text=savedNames.Contains(name.Text.Trim()) ? "Saved securely" : "Not saved";
             password.PasswordChanged+=(_,_)=>saved.Text=password.Password.Length>0 ? "Ready to save" : savedNames.Contains(name.Text.Trim()) ? "Saved securely" : "Not saved";
+            name.TextChanged+=(_,_)=>UpdateAccountDraft();
+            password.PasswordChanged+=(_,_)=>UpdateAccountDraft();
             AccountRows.Children.Add(new Border {Style=(Style)FindResource("Card"),Padding=new Thickness(14,10,14,10),Margin=new Thickness(0,0,0,8),Child=grid});
         }
     }
     private void LoadSettings(JsonElement settings)
     {
+        loadingSettings=true;
+        try {
         workerCount=N(settings,"workerCount",4);
         savedWorkerCount=workerCount;
         var accounts=settings.GetProperty("accounts").EnumerateArray().ToArray();
+        savedAccountNames=Enumerable.Range(0,MaxAgents).Select(i=>i<accounts.Length ? S(accounts[i],"username") : "").ToArray();
         savedNames.Clear(); foreach(var a in accounts) if(B(a,"hasPassword")) savedNames.Add(S(a,"username"));
         WelcomeCard.Visibility=savedNames.Count==0 ? Visibility.Visible : Visibility.Collapsed;
         for(int i=0;i<MaxAgents;i++) {
@@ -214,47 +218,43 @@ public partial class MainWindow : Window
             credentialLabels[i].Text=i<accounts.Length && B(accounts[i],"hasPassword") ? "Saved securely" : "Not saved";
         }
         UpdateCount();
+        } finally { loadingSettings=false; }
+        accountEditsPending=false;
+    }
+    private void UpdateAccountDraft() {
+        if(loadingSettings || usernames.Count!=MaxAgents) return;
+        accountEditsPending=workerCount!=savedWorkerCount || passwords.Any(p=>p.Password.Length>0)
+            || usernames.Where((n,i)=>n.Text.Trim()!=savedAccountNames[i]).Any();
+        if(accountEditsPending) {
+            CountChangeStatus.Text="Unsaved account changes. Select Save & apply to use these accounts and this agent count. The scanner still uses your saved settings.";
+            CountChangeStatus.Foreground=(Brush)FindResource("RedBrush");
+            ResumeButton.IsEnabled=false;
+        }
     }
     private void UpdateCount() { AgentCount.Text=workerCount.ToString(); for(int i=0;i<MaxAgents;i++) {slotLabels[i].Text=$"Agent {i+1}\n"+(i<workerCount ? "Selected slot" : "Standby"); slotLabels[i].Foreground=(Brush)FindResource(i<workerCount ? "TextBrush" : "GrayBrush");} }
     private void ChangeWorkerCount(int delta) {
         int next=Math.Clamp(workerCount+delta,1,MaxAgents);
         if(next==workerCount) return;
         workerCount=next; UpdateCount();
-        if(verifyUi || smokeTest) return; // UI verification never changes scanner settings.
-        CountChangeStatus.Text=$"Applying {workerCount} agents using saved accounts…";
-        CountChangeStatus.Foreground=(Brush)FindResource("SubTextBrush");
-        countTimer.Stop(); countTimer.Start();
+        UpdateAccountDraft();
     }
     private void LessAgents(object s,RoutedEventArgs e) => ChangeWorkerCount(-1);
     private void MoreAgents(object s,RoutedEventArgs e) => ChangeWorkerCount(1);
-    private async Task ApplyCountChange() {
-        if(closed) return;
-        if(busy || refreshing) { countTimer.Start(); return; }
-        int desired=workerCount;
-        busy=true; ApplyButton.IsEnabled=ResumeButton.IsEnabled=PauseButton.IsEnabled=false;
-        try {
-            var result=await Request(new {command="set_worker_count",workerCount=desired});
-            savedWorkerCount=desired;
-            if(workerCount==desired) CountChangeStatus.Text=S(result,"message");
-        } catch(Exception ex) {
-            CountChangeStatus.Text=ex.Message+" Save account details below, then try the count again.";
-            CountChangeStatus.Foreground=(Brush)FindResource("RedBrush");
-        } finally {
-            busy=false;ApplyButton.IsEnabled=true;
-            await RefreshSnapshot();
-        }
-    }
     private object AccountRequest() => new {command="apply",workerCount,accounts=usernames.Select((n,i)=>new {username=n.Text.Trim(),password=passwords[i].Password}).ToArray()};
     private async Task Execute(object request,bool reloadSettings=false)
     {
         if(busy) return; busy=true; ApplyButton.IsEnabled=ResumeButton.IsEnabled=PauseButton.IsEnabled=false;
+        if(reloadSettings) AccountsScroll.IsEnabled=false;
         ShowMessage("Applying your request…");
         try { var result=await Request(request); ShowMessage(S(result,"message")); if(reloadSettings) LoadSettings(await Request(new {command="settings"})); }
-        catch(Exception ex) { ShowMessage(ex.Message,true); }
-        finally { busy=false; ApplyButton.IsEnabled=true; await RefreshSnapshot(); }
+        catch(Exception ex) { ShowMessage(ex.Message,true); if(reloadSettings) { CountChangeStatus.Text="Not saved: "+ex.Message; CountChangeStatus.Foreground=(Brush)FindResource("RedBrush"); } }
+        finally { busy=false; ApplyButton.IsEnabled=true; AccountsScroll.IsEnabled=true; await RefreshSnapshot(); }
     }
     private async void Apply_Click(object s,RoutedEventArgs e) => await Execute(AccountRequest(),true);
-    private async void Resume_Click(object s,RoutedEventArgs e) => await Execute(new {command="start"});
+    private async void Resume_Click(object s,RoutedEventArgs e) {
+        if(accountEditsPending) { ShowPage(NavAccounts); ShowMessage("Save & apply your account changes before starting.",true); return; }
+        await Execute(new {command="start"});
+    }
     private async void Pause_Click(object s,RoutedEventArgs e) => await Execute(new {command="stop"});
     private async void Restart_Click(object s,RoutedEventArgs e) { if(WorkerList.SelectedItem is WorkerEntry w) await Execute(new {command="restart_worker",index=w.Id}); }
     private void ShowMessage(string message,bool error=false) { StatusText.Text=message; StatusText.Foreground=(Brush)FindResource(error ? "RedBrush" : "SubTextBrush"); messageUntil=DateTime.Now.AddSeconds(10); }
@@ -321,7 +321,7 @@ public partial class MainWindow : Window
     private void Minimize(object s,RoutedEventArgs e) => WindowState=WindowState.Minimized;
     private void Maximize(object s,RoutedEventArgs e) => WindowState=WindowState==WindowState.Maximized?WindowState.Normal:WindowState.Maximized;
     private void CloseApp(object s,RoutedEventArgs e) => Close();
-    private void Window_Closed(object? s,EventArgs e) { closed=true;timer.Stop();highlightTimer.Stop();countTimer.Stop();try {bridge?.StandardInput.Close();}catch{} }
+    private void Window_Closed(object? s,EventArgs e) { closed=true;timer.Stop();highlightTimer.Stop();try {bridge?.StandardInput.Close();}catch{} }
 
     private async Task VerifyAndCapture()
     {
@@ -343,7 +343,6 @@ public partial class MainWindow : Window
         }
         workerCount=1;LessAgents(this,new());if(workerCount!=1)throw new Exception("Agent minimum failed");
         workerCount=MaxAgents;MoreAgents(this,new());if(workerCount!=MaxAgents)throw new Exception("Agent maximum failed");
-        if(countTimer.IsEnabled) throw new Exception("UI verification must not send count changes");
         LoadSettings(await Request(new {command="settings"}));
         var tenAccounts=Enumerable.Range(1,MaxAgents).Select(i=>new {username=$"Example account {i}",hasPassword=false}).ToArray();
         LoadSettings(JsonSerializer.SerializeToElement(new {workerCount=MaxAgents,accounts=tenAccounts}));
@@ -434,10 +433,40 @@ public partial class MainWindow : Window
         bitmap.Render(this);
         var encoder=new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
         using(var file=File.Create(Path.Combine(output,"first-run.png"))) encoder.Save(file);
+        await VerifyAccountEditing();
         await File.WriteAllTextAsync(Path.Combine(output,"smoke-test.json"),JsonSerializer.Serialize(new {
             passed=true,blankAccounts=true,paused=true,bridgeConnected=true,automationConnected=true,
+            accountEditsSaved=true,unsavedEditsPreserved=true,invalidSavePreservesSettings=true,
             accountsPage=AccountsView.Visibility==Visibility.Visible
         }));
+    }
+
+    private async Task VerifyAccountEditing()
+    {
+        // This runs only inside the isolated fresh-install smoke-test profile.
+        usernames[0].Text="EogFixtureOriginal"; passwords[0].Password="synthetic-test-password";
+        await Execute(AccountRequest(),true);
+        var original=await Request(new {command="settings"});
+        if(S(original.GetProperty("accounts")[0],"username")!="EogFixtureOriginal")
+            throw new InvalidOperationException("The first account was not saved.");
+        usernames[0].Text="EogFixtureReplacement"; passwords[0].Password="replacement-test-password";
+        ChangeWorkerCount(1);
+        await RefreshSnapshot();
+        if(!accountEditsPending || workerCount!=2 || usernames[0].Text!="EogFixtureReplacement" || ResumeButton.IsEnabled)
+            throw new InvalidOperationException("Polling changed the draft or allowed stale accounts to start.");
+        await Execute(AccountRequest(),true); // Agent 2 is deliberately missing.
+        var unchanged=await Request(new {command="settings"});
+        if(N(unchanged,"workerCount")!=1 || S(unchanged.GetProperty("accounts")[0],"username")!="EogFixtureOriginal"
+            || !CountChangeStatus.Text.StartsWith("Not saved:"))
+            throw new InvalidOperationException("An incomplete edit replaced saved settings or hid the error.");
+        usernames[1].Text="EogFixtureSecond"; passwords[1].Password="second-test-password";
+        await Execute(AccountRequest(),true);
+        var saved=await Request(new {command="settings"});
+        var accounts=saved.GetProperty("accounts");
+        if(accountEditsPending || N(saved,"workerCount")!=2 || accounts.GetArrayLength()!=2
+            || S(accounts[0],"username")!="EogFixtureReplacement" || S(accounts[1],"username")!="EogFixtureSecond"
+            || accounts.EnumerateArray().Any(a=>!B(a,"hasPassword")) || B(saved,"running"))
+            throw new InvalidOperationException("The edited account list and count were not saved together.");
     }
 }
 
