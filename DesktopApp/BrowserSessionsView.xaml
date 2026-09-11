@@ -29,7 +29,7 @@
      <Border Grid.Row="2" Background="#101010" CornerRadius="10">
       <Grid><Image x:Name="SessionImage" Stretch="Uniform" Margin="4"/><TextBlock x:Name="EmptyPreview" Text="No browser session selected" Style="{StaticResource MutedText}" HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center" Margin="24"/></Grid>
      </Border>
-     <StackPanel Grid.Row="3" Margin="0,12,0,0"><TextBlock x:Name="FrameTime" Text="Previews appear once an agent starts verifying slots." Style="{StaticResource MutedText}" FontSize="11"/><TextBlock Text="Live previews are read-only. Login fields and passwords are not displayed." Style="{StaticResource MutedText}" FontSize="11" Margin="0,5,0,0"/></StackPanel>
+     <StackPanel Grid.Row="3" Margin="0,12,0,0"><TextBlock x:Name="FrameTime" Text="Previews appear once an agent starts verifying slots." Style="{StaticResource MutedText}" FontSize="11"/><TextBlock Text="Read-only preview · updates as the agent verifies slots." Style="{StaticResource MutedText}" FontSize="11" Margin="0,5,0,0"/></StackPanel>
     </Grid>
    </Border>
   </Grid>
