@@ -1,0 +1,44 @@
+<UserControl x:Class="EternalVoidPanel.Browsing.BrowserWorkspace"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:EternalVoidPanel.Browsing"
+ FontFamily="Segoe UI" FontSize="12" UseLayoutRounding="True">
+ <UserControl.Resources><ResourceDictionary><ResourceDictionary.MergedDictionaries><ResourceDictionary Source="BrowserTheme.xaml"/></ResourceDictionary.MergedDictionaries></ResourceDictionary></UserControl.Resources>
+ <Grid>
+  <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="24"/></Grid.RowDefinitions>
+  <Grid Margin="0,0,0,8">
+   <StackPanel><TextBlock Text="Browsers" Style="{StaticResource PageTitle}"/><TextBlock Text="Your saved sessions · available while scanning is paused" Foreground="{StaticResource Muted}" FontSize="11" Margin="0,2,0,4"/></StackPanel>
+   <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+    <Button x:Name="AssistantButton" Content="Assistant · off" Click="Assistant_Click" Margin="0,0,6,0"/>
+    <Button Content="Accounts" Click="Accounts_Click" Margin="0,0,6,0"/>
+    <Button x:Name="MuteAllButton" Content="Mute all" Click="MuteAll_Click" Margin="0,0,6,0"/>
+    <Button Content="Help" Click="Help_Click"/>
+   </StackPanel>
+  </Grid>
+  <WrapPanel Grid.Row="1" Margin="0,0,0,10" VerticalAlignment="Center">
+   <Button x:Name="RemoveButton" Content="−" Width="30" Click="Remove_Click" Margin="0,0,4,4" ToolTip="Close the last browser (or the expanded browser). Saved login is kept."/>
+   <TextBlock x:Name="InstanceCount" VerticalAlignment="Center" Margin="4,0,8,4"/>
+   <Button x:Name="AddButton" Content="+" Width="30" Click="Add_Click" Margin="0,0,12,4" ToolTip="Add a browser. Reopens your most recently closed saved session first."/>
+   <Button x:Name="OneRowButton" Content="1 row" Click="OneRow_Click" Margin="0,0,4,4"/>
+   <Button x:Name="TwoRowsButton" Content="2 rows" Click="TwoRows_Click" Margin="0,0,12,4"/>
+   <TextBlock Text="Mobile width" Foreground="{StaticResource Muted}" VerticalAlignment="Center" Margin="0,0,8,4"/>
+   <Slider x:Name="WidthSlider" Width="110" Minimum="260" Maximum="480" TickFrequency="20" IsSnapToTickEnabled="True" ValueChanged="Width_Changed" VerticalAlignment="Center" Margin="0,0,8,4" ToolTip="Adjust each browser's width in pixels. Extra browsers scroll horizontally."/>
+   <TextBlock x:Name="WidthLabel" Width="45" VerticalAlignment="Center" Foreground="{StaticResource Muted}" Margin="0,0,6,4"/>
+   <Button x:Name="FitButton" Content="Auto fit" Click="Fit_Click" Margin="0,0,10,4" ToolTip="Keep browsers fitted when adding, closing or resizing. The width slider switches to manual sizing."/>
+   <Button x:Name="RestoreButton" Content="Show all" Visibility="Collapsed" Click="Restore_Click" Margin="0,0,6,4"/>
+   <Button Content="Open in all…" Click="OpenAll_Click" Margin="0,0,0,4"/>
+  </WrapPanel>
+  <Grid Grid.Row="2">
+   <local:BrowserScrollViewer x:Name="BrowserScroll" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" CanContentScroll="False" SizeChanged="Viewport_Changed">
+    <Grid x:Name="BrowserGrid" HorizontalAlignment="Left" VerticalAlignment="Top"/>
+   </local:BrowserScrollViewer>
+   <StackPanel x:Name="EmptyView" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center">
+    <TextBlock Text="No browsers open" FontSize="20" HorizontalAlignment="Center" Margin="0,0,0,10"/>
+    <TextBlock Text="Add a browser to continue. Your saved sessions are kept." Foreground="{StaticResource Muted}" Margin="0,0,0,16"/>
+    <Button Content="+  Add browser" Click="Add_Click" HorizontalAlignment="Center"/>
+   </StackPanel>
+  </Grid>
+  <Grid Grid.Row="3" Margin="2,0">
+   <TextBlock x:Name="StatusText" Foreground="{StaticResource Muted}" FontSize="10" VerticalAlignment="Center"/>
+   <TextBlock Text="Drag headers to move" Foreground="#707070" FontSize="10" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+  </Grid>
+ </Grid>
+</UserControl>

@@ -19,7 +19,7 @@ function Get-VerifiedDownload([string]$Url, [string]$Path, [string]$Sha256) {
 function Assert-Exit([string]$Step) { if ($LASTEXITCODE -ne 0) { throw "$Step failed (exit $LASTEXITCODE)." } }
 
 Write-Host 'Building the self-contained Windows desktop app...'
-& dotnet publish (Join-Path $projectRoot 'DesktopApp/EyeOfGod.csproj') -c Release -r win-x64 --self-contained true -o $packageRoot -p:DebugType=None -p:DebugSymbols=false -p:RuntimeFrameworkVersion=8.0.31 -p:Version=$Version
+& dotnet publish (Join-Path $projectRoot 'DesktopApp/EyeOfGod.csproj') -c Release -r win-x64 --self-contained true -o $packageRoot -p:DebugType=None -p:DebugSymbols=false -p:Version=$Version
 Assert-Exit 'Desktop publish'
 
 # Explicit allowlist: never copy a working directory, local data or credentials.
@@ -40,6 +40,17 @@ $pythonArchive = Join-Path $cacheRoot "python-$pythonVersion.tar.gz"
 Get-VerifiedDownload 'https://github.com/astral-sh/python-build-standalone/releases/download/20260901/cpython-3.12.14%2B20260901-x86_64-pc-windows-msvc-install_only_stripped.tar.gz' $pythonArchive '7C45C9622400D578709A9B2CDDBE8124CC21D382409D9F13406D706D28E31B14'
 $pythonRoot = Join-Path $packageRoot 'runtime/python'
 New-Item -ItemType Directory -Force (Join-Path $packageRoot 'runtime') | Out-Null
+# Evergreen is installed per-user on first browser use only when absent.
+# Its moving download is validated by Microsoft's Authenticode signature.
+$webviewSetup = Join-Path $cacheRoot 'MicrosoftEdgeWebview2Setup.exe'
+if (!(Test-Path -LiteralPath $webviewSetup)) {
+    Invoke-WebRequest -Uri 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile $webviewSetup
+}
+$webviewSignature = Get-AuthenticodeSignature -LiteralPath $webviewSetup
+if ($webviewSignature.Status -ne 'Valid' -or $webviewSignature.SignerCertificate.Subject -notmatch 'O=Microsoft Corporation,') {
+    throw 'The WebView2 installer is not signed by Microsoft.'
+}
+Copy-Item -LiteralPath $webviewSetup -Destination (Join-Path $packageRoot 'runtime/MicrosoftEdgeWebview2Setup.exe')
 & tar -xf $pythonArchive -C (Join-Path $packageRoot 'runtime')
 Assert-Exit 'Python extraction'
 # Isolated relative import paths keep subprocesses portable and ignore user Python installs.

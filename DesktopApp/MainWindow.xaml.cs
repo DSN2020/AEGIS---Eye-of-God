@@ -47,8 +47,6 @@ public partial class MainWindow : Window
         InitializeComponent(); SetCoordinateView(false); BuildAccountRows(); ActivityList.ItemsSource=activityRows;
         highlightTimer.Tick+=(_,_)=>ExpireActivityHighlights(activityClock.Elapsed);
         highlightTimer.Start();
-        Browsers.ManageAccounts=()=>ShowPage(NavAccounts);
-        Browsers.RestartSession=index=>Execute(new {command="restart_worker",index});
         StateChanged+=(_,_)=>UpdateWindowShape();
     }
 
@@ -80,6 +78,14 @@ public partial class MainWindow : Window
     private async void Window_Loaded(object sender,RoutedEventArgs e)
     {
         try {
+            if(Environment.GetCommandLineArgs().Contains("--verify-browsers")) {
+                if(Browsers.HasStarted) throw new InvalidOperationException("Browsers must start only when selected.");
+                ShowPage(NavBrowsers);
+                await Browsers.EnsureStartedAsync();
+                int result=await Browsing.BrowserChecks.RunAsync(Browsers,Browsers.DataRoot,selected=>ShowPage(selected?NavBrowsers:NavLive));
+                Application.Current.Shutdown(result); return;
+            }
+            if(Environment.GetCommandLineArgs().Contains("--browsers")) ShowPage(NavBrowsers);
             if(Environment.GetCommandLineArgs().Contains("--preview-ui")) {
                 await CaptureDesignPreview(); Close(); return;
             }
@@ -99,11 +105,12 @@ public partial class MainWindow : Window
             }
             if(smokeTest) { await VerifyFreshInstall(); Close(); return; }
             if(verifyUi) { await VerifyAndCapture(); Close(); return; }
+            if(Environment.GetCommandLineArgs().Contains("--browsers")) ShowPage(NavBrowsers);
             timer.Tick+=async (_,_) => await RefreshSnapshot(); timer.Start();
         } catch(Exception ex) {
             ShowMessage(ex.Message,true);
             ResumeButton.IsEnabled=PauseButton.IsEnabled=ApplyButton.IsEnabled=false;
-            if(verifyUi || smokeTest || Environment.GetCommandLineArgs().Contains("--preview-ui")) {
+            if(verifyUi || smokeTest || Environment.GetCommandLineArgs().Contains("--preview-ui") || Environment.GetCommandLineArgs().Contains("--verify-browsers")) {
                 string output=Environment.GetEnvironmentVariable("EOG_TEST_OUTPUT") ?? AppContext.BaseDirectory;
                 Directory.CreateDirectory(output);
                 await File.WriteAllTextAsync(Path.Combine(output,"ui-error.txt"),ex.ToString());
@@ -164,7 +171,6 @@ public partial class MainWindow : Window
                 LastCompleted=S(w,"lastCompleted","—"),Restarts=N(w,"restarts"),FramePath=S(w,"framePath"),FrameUpdated=D(w,"frameUpdated") }).ToList();
             WorkerList.ItemsSource=workers; WorkerList.SelectedItem=workers.FirstOrDefault(w=>w.Id==selected) ?? workers.FirstOrDefault();
             UpdatePreview();
-            Browsers.Update(snapshot.GetProperty("settings").GetProperty("accounts").EnumerateArray().Take(configured).Select(a=>S(a,"username")).ToArray(),workers,S(status,"browserMode"),state=="running");
             var players=snapshot.GetProperty("players");
             string nextKey=players.GetRawText();
             if(playerKey!=nextKey) {
@@ -237,6 +243,7 @@ public partial class MainWindow : Window
         workerCount=N(settings,"workerCount",4);
         savedWorkerCount=workerCount;
         var accounts=settings.GetProperty("accounts").EnumerateArray().ToArray();
+        Browsers.UseScannerAccounts(Path.Combine(root,"data"),accounts.Select(a=>S(a,"username")));
         savedAccountNames=Enumerable.Range(0,MaxAgents).Select(i=>i<accounts.Length ? S(accounts[i],"username") : "").ToArray();
         savedNames.Clear(); foreach(var a in accounts) if(B(a,"hasPassword")) savedNames.Add(S(a,"username"));
         WelcomeCard.Visibility=savedNames.Count==0 ? Visibility.Visible : Visibility.Collapsed;
@@ -295,6 +302,7 @@ public partial class MainWindow : Window
         AccountsView.Visibility=selected==NavAccounts ? Visibility.Visible : Visibility.Collapsed;
         ActivityView.Visibility=selected==NavActivity ? Visibility.Visible : Visibility.Collapsed;
         Browsers.Visibility=selected==NavBrowsers ? Visibility.Visible : Visibility.Collapsed;
+        if(selected==NavBrowsers) _=Browsers.EnsureStartedAsync();
         Automation.Visibility=selected==NavAutomation ? Visibility.Visible : Visibility.Collapsed;
         foreach(var button in new[]{NavLive,NavBrowsers,NavPlayers,NavAccounts,NavActivity,NavAutomation}) button.Style=(Style)FindResource(button==selected ? "NavButtonActive" : "NavButton");
     }
@@ -350,7 +358,7 @@ public partial class MainWindow : Window
     private void Minimize(object s,RoutedEventArgs e) => WindowState=WindowState.Minimized;
     private void Maximize(object s,RoutedEventArgs e) => WindowState=WindowState==WindowState.Maximized?WindowState.Normal:WindowState.Maximized;
     private void CloseApp(object s,RoutedEventArgs e) => Close();
-    private void Window_Closed(object? s,EventArgs e) { closed=true;timer.Stop();highlightTimer.Stop();try {bridge?.StandardInput.Close();}catch{} }
+    private void Window_Closed(object? s,EventArgs e) { closed=true;timer.Stop();highlightTimer.Stop();Browsers.Dispose();try {bridge?.StandardInput.Close();}catch{} }
 
     private async Task VerifyAndCapture()
     {

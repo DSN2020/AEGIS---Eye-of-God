@@ -46,8 +46,8 @@ public partial class MainWindow
             new {id="preview3",account="Cassiopeia",timestamp=now-30,text="Scan paused. Confirmed slots and coordinates are saved."},
             new {id="preview4",account="Orion",timestamp=now-45,text="Session ready · continuing from the last saved checkpoint."}
         }),activityClock.Elapsed);
-        Browsers.VerifySessions(Path.Combine(output,"welcome.png"));
-        Browsers.Update(sampleNames,workers,"isolated",true);
+        ShowPage(NavBrowsers);
+        await Browsers.EnsureStartedAsync();
         foreach(var page in new[]{(NavLive,"overview"),(NavBrowsers,"browsers"),(NavAccounts,"accounts"),(NavPlayers,"players"),(NavActivity,"activity"),(NavAutomation,"automation")}) {
             ShowPage(page.Item1);await SavePreview(output,page.Item2);
         }
