@@ -86,6 +86,26 @@ class BridgeTests(unittest.TestCase):
         self.assertIn('diagnostic continuation',first[0]['text'])
         self.assertEqual([e['id'] for e in first],[e['id'] for e in second])
 
+    def test_activity_keeps_the_account_that_actually_ran_each_session(self):
+        path=self.root/'data'/'worker-1.log'
+        path.write_text('2026-09-11 12:00:00 START account=old-user galaxy=1\n'
+                        '2026-09-11 12:00:01 ERROR Stopped: old login failed\n'
+                        '2026-09-11 12:01:00 START account=new-user galaxy=1\n'
+                        '2026-09-11 12:01:01 INFO Login submitted\n')
+        first=recent_activity(path,'current-label')
+        second=recent_activity(path,'changed-label')
+        self.assertEqual([e['account'] for e in first],['old-user','old-user','new-user','new-user'])
+        self.assertEqual([e['id'] for e in first],[e['id'] for e in second])
+
+    def test_incomplete_new_account_does_not_replace_running_settings(self):
+        original=(self.root/'config.json').read_bytes()
+        with patch.object(self.bridge,'stop') as stop:
+            with self.assertRaisesRegex(ValueError,'Agent 2'):
+                self.bridge.dispatch({'command':'apply','workerCount':2,'accounts':[
+                    {'username':'new-user','password':'fixture-only'}, {'username':'','password':''}]})
+        stop.assert_not_called()
+        self.assertEqual((self.root/'config.json').read_bytes(),original)
+
     def test_player_directory_uses_latest_observation_not_name(self):
         with patch('ev_assistant.store.time.time',return_value=100):
             self.bridge.store.record_sighting('test',1,1,Planet(1,'Alpha',''))

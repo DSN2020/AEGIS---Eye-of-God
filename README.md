@@ -47,7 +47,7 @@ Setup creates a virtual environment, copies `config.example.json` to `config.jso
 
 To build a distributable Windows download, see [packaging instructions](packaging/README.md). Publishing only `EOG.exe` from the source build does not include the scanner runtime.
 
-In **Agents & accounts**, enter your accounts and select **Save & apply**, then use **Resume scan**. Count changes apply automatically using saved account details; username/password edits require Save & apply. Additional workers share the computer's resources and may not increase throughput.
+In **Agents & accounts**, choose the agent count, enter one account per selected slot, and select **Save & apply**, then use **Resume scan**. Usernames and email logins are supported. Count and account edits are saved together; an unsaved draft does not change the running scanner. Additional workers share the computer's resources and may not increase throughput.
 
 Closing EOG leaves the scanner running. **Pause scan** stops workers and retains progress. Findings represent last observed ownership. An incomplete scan is not evidence that no other players exist.
 

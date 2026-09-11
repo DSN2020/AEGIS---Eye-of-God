@@ -135,6 +135,7 @@ class Slot:
         self.last_completed_time = None
         self.last_completed_at = None
         self.next_launch = time.monotonic() + index * 12
+        self.login_blocked = False
         self.log_path = data / f'worker-{index + 1}.log'
 
     def start(self, galaxy):
@@ -203,6 +204,7 @@ class Slot:
             self.output = None
 
     def restart(self, reason):
+        self.login_blocked = False
         LOG.warning('Restarting ONLY worker %s (%s): %s', self.index + 1, self.account, reason)
         self.close()
         self.restarts += 1
@@ -217,6 +219,11 @@ class Slot:
                 return
             if self.process is not None:
                 self.observe_log()
+                if self.process.poll() is not None and 'LOGIN ACTION REQUIRED:' in self.detail:
+                    self.close()
+                    self.login_blocked = True
+                    self.state = 'error'
+                    return
                 if self.process.poll() is not None and (self.process.returncode == 0 or
                                                        galaxy_done(self.data, self.galaxy, end)):
                     finished = galaxy_done(self.data, self.galaxy, end)
@@ -234,6 +241,8 @@ class Slot:
                     reason = self.failure_reason()
                     if reason:
                         self.restart(reason)
+            if self.login_blocked:
+                return
             if self.process is None and time.monotonic() >= self.next_launch:
                 if self.galaxy is None and pending:
                     self.galaxy = pending.pop(0)
@@ -349,7 +358,7 @@ def main():
                 command_path.unlink(missing_ok=True)
                 index = command.get('index',0)-1
                 if command.get('action') == 'restart' and 0 <= index < len(slots):
-                    if browser_ready and slots[index].process is not None and slots[index].state != 'managing':
+                    if browser_ready and (slots[index].process is not None or slots[index].login_blocked) and slots[index].state != 'managing':
                         slots[index].restart('Requested in EOG')
             if browser_ready:
                 for slot in slots:

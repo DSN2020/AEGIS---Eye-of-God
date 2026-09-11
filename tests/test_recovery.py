@@ -21,53 +21,54 @@ def line(text, x=150, y=300, confidence=.99):
 class PopupTests(unittest.IsolatedAsyncioTestCase):
     async def test_shared_session_can_finish_loading_after_90_seconds(self):
         reader = Reader.__new__(Reader)
+        reader.check_stop = Mock()
         reader.config = {'_shared_browser_endpoint': 'fixture'}
-        reader.observe = AsyncMock(return_value=(
-            [line('Planets'), line('Fleet'), line('Alliance')], b''))
-        with patch('ev_assistant.__main__.time.monotonic', side_effect=[0, 100]):
+        reader.observe = AsyncMock(return_value=([line('Planets Fleet Alliance')], b''))
+        with patch('ev_assistant.login.monotonic', side_effect=[0, 100]), \
+                patch('ev_assistant.login.click_named', new=AsyncMock(return_value=False)), \
+                patch('ev_assistant.login.login_fields', new=AsyncMock(return_value=None)):
             await reader.login_and_enter(Mock(), {'username': 'test'})
         reader.observe.assert_awaited_once()
 
     async def test_invalid_username_or_password_tries_second_supplied_password(self):
         reader = Reader.__new__(Reader)
-        login = ([line('Password'), line('Log in')], b'')
-        reader.observe = AsyncMock(side_effect=[login,
-            ([line('Invalid username or password.')], b''), login,
-            ([line('Planets'), line('Fleet'), line('Alliance')], b'')])
-        page = Mock()
-        page.mouse.click = AsyncMock()
-        identifier, password = Mock(), Mock()
-        for field, kind in [(identifier, 'text'), (password, 'password')]:
-            field.is_disabled = AsyncMock(return_value=False)
-            field.get_attribute = AsyncMock(return_value=kind)
-            field.fill = AsyncMock()
-        inputs = page.locator.return_value
-        inputs.count = AsyncMock(return_value=2)
-        inputs.nth.side_effect = lambda i: [identifier, password][i]
-        page.get_by_role.return_value.click = AsyncMock()
-        with patch('ev_assistant.__main__.asyncio.sleep', new=AsyncMock()):
-            await reader.login_and_enter(page, {'username': 'test', 'passwords': ['first', 'second']})
-        self.assertEqual([c.args[0] for c in password.fill.await_args_list], ['first', 'second'])
-        page.mouse.click.assert_awaited_once_with(235, 565)
+        reader.check_stop = Mock()
+        reader.observe = AsyncMock(side_effect=[
+            ([line('Invalid username or password.')], b''),
+            ([line('Planets Fleet Alliance')], b'')])
+        fields = (Mock(), Mock())
+        async def click(page, pattern):
+            return pattern == r'ok|close|try again'
+        with patch('ev_assistant.login.click_named', new=click), \
+                patch('ev_assistant.login.login_fields', new=AsyncMock(side_effect=[fields,None,fields,None])), \
+                patch('ev_assistant.login.submit_login', new=AsyncMock()) as submit, \
+                patch('ev_assistant.login.asyncio.sleep', new=AsyncMock()):
+            await reader.login_and_enter(Mock(), {'username':'test','passwords':['first','second']})
+        self.assertEqual([c.args[3] for c in submit.await_args_list], ['first','second'])
 
     async def test_expired_session_does_not_submit_an_empty_password(self):
         reader = Reader.__new__(Reader)
-        reader.observe = AsyncMock(return_value=([line('Password'), line('Log in')], b''))
-        page = Mock()
-        with self.assertRaisesRegex(UncertainScreen, 'no password available'):
-            await reader.login_and_enter(page, {'username': 'test'})
-        page.locator.assert_not_called()
+        reader.check_stop = Mock()
+        with patch('ev_assistant.login.click_named', new=AsyncMock(return_value=False)), \
+                patch('ev_assistant.login.login_fields', new=AsyncMock(return_value=(Mock(),Mock()))), \
+                patch('ev_assistant.login.submit_login', new=AsyncMock()) as submit:
+            with self.assertRaisesRegex(UncertainScreen, 'Save this account'):
+                await reader.login_and_enter(Mock(), {'username':'test'})
+        submit.assert_not_awaited()
 
     async def test_required_fields_dialog_is_dismissed_before_entering_game(self):
         reader = Reader.__new__(Reader)
+        reader.check_stop = Mock()
         reader.observe = AsyncMock(side_effect=[
-            ([line('All fields are required.')], b''),
-            ([line('Planets'), line('Fleet'), line('Alliance')], b'')])
+            ([line('All fields are required.'),line('OK',x=210,y=540)], b''),
+            ([line('Planets Fleet Alliance')], b'')])
         page = Mock()
         page.mouse.click = AsyncMock()
-        with patch('ev_assistant.__main__.asyncio.sleep', new=AsyncMock()):
-            await reader.login_and_enter(page, {'username': 'test'})
-        page.mouse.click.assert_awaited_once_with(235, 565)
+        with patch('ev_assistant.login.click_named', new=AsyncMock(return_value=False)), \
+                patch('ev_assistant.login.login_fields', new=AsyncMock(return_value=None)), \
+                patch('ev_assistant.login.asyncio.sleep', new=AsyncMock()):
+            await reader.login_and_enter(page, {'username':'test'})
+        page.mouse.click.assert_awaited_once_with(210,540)
 
     def test_fixed_ui_ocr_does_not_auto_rotate_coordinates(self):
         ocr = OCR.__new__(OCR)
