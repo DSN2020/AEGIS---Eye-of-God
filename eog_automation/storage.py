@@ -4,7 +4,9 @@ import os
 from pathlib import Path
 import tempfile
 
-ROOT = Path(__file__).resolve().parent.parent
+from ev_assistant.runtime import user_root
+
+ROOT = user_root()
 DATA = Path(os.environ.get('EVO_MANAGER_DATA', str(ROOT / 'data' / 'automation')))
 
 

@@ -1,0 +1,19 @@
+# Tested with the bundled CPython 3.12.14 Windows x64 runtime.
+colorama==0.4.6
+flatbuffers==25.12.19
+greenlet==3.5.5
+numpy==2.5.3
+onnxruntime==1.30.0
+opencv-python==5.0.0.93
+packaging==26.3
+pillow==12.3.0
+playwright==1.62.0
+protobuf==7.36.1
+pyclipper==1.4.0
+pyee==13.0.1
+PyYAML==6.0.3
+rapidocr-onnxruntime==1.4.4
+shapely==2.1.2
+six==1.17.0
+tqdm==4.70.1
+typing_extensions==4.16.0

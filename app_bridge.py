@@ -12,8 +12,9 @@ from ev_assistant.limits import MAX_AGENTS
 from ev_assistant.store import Store
 from ev_assistant.credentials import load_passwords, save_passwords
 from isolated_supervisor import atomic_json
+from ev_assistant.runtime import APP_ROOT, user_root, child_environment, supervisor_port
 
-ROOT = Path(__file__).resolve().parent
+ROOT = user_root()
 DATA = ROOT / 'data'
 
 def recent_activity(path, account):
@@ -72,7 +73,7 @@ class ApplicationBridge:
     def running(self):
         probe = socket.socket()
         try:
-            probe.bind(('127.0.0.1',47682))
+            probe.bind(('127.0.0.1',supervisor_port(self.root)))
             return False
         except OSError:
             return True
@@ -149,8 +150,8 @@ class ApplicationBridge:
         self.validate_settings(settings)
         (self.data/'STOP').unlink(missing_ok=True)
         with (self.data/'desktop-supervisor.log').open('a',encoding='utf-8') as log:
-            subprocess.Popen([sys.executable,'-u','sweep_supervisor.py'],cwd=self.root,
-                stdout=log,stderr=log,creationflags=subprocess.CREATE_NO_WINDOW)
+            subprocess.Popen([sys.executable,'-u',str(APP_ROOT/'sweep_supervisor.py')],cwd=APP_ROOT,
+                env=child_environment(self.root), stdout=log,stderr=log,creationflags=subprocess.CREATE_NO_WINDOW)
         return {'message':'Starting agents from their saved checkpoints.'}
 
     def snapshot(self):

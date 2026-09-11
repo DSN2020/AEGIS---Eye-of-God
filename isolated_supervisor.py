@@ -15,8 +15,9 @@ from ev_assistant.coverage import sweep_positions
 from ev_assistant.shared_browser import SharedBrowserHost
 from ev_assistant.store import Store
 from ev_assistant.__main__ import export_players
+from ev_assistant.runtime import APP_ROOT, user_root, supervisor_port
 
-ROOT = Path(__file__).resolve().parent
+ROOT = user_root()
 DATA = ROOT / 'data'
 LOG = logging.getLogger('supervisor')
 JSON_CACHE = {}
@@ -155,7 +156,7 @@ class Slot:
         self.process = subprocess.Popen(
             [sys.executable, '-u', '-m', 'ev_assistant', 'sweep',
              '--config', str(config_path), '--data-dir', str(job)],
-            cwd=ROOT, stdout=self.output, stderr=subprocess.STDOUT,
+            cwd=APP_ROOT, stdout=self.output, stderr=subprocess.STDOUT,
             creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
         self.last_seen, self.last_event = time.monotonic(), stamp()
         self.event_count = 0
@@ -295,7 +296,7 @@ def main():
                                   logging.StreamHandler()])
     singleton = socket.socket()
     try:
-        singleton.bind(('127.0.0.1', 47682))
+        singleton.bind(('127.0.0.1', supervisor_port(ROOT)))
     except OSError:
         LOG.error('A scan supervisor is already running')
         return
@@ -309,7 +310,7 @@ def main():
     pending = pending_galaxies(DATA, galaxies, end)
     slots = [Slot(index, config) for index in range(config['sweep']['workers'])]
     browser_mode = config['sweep'].get('browser_mode', 'isolated')
-    host = SharedBrowserHost(ROOT, DATA) if browser_mode == 'shared' else None
+    host = SharedBrowserHost(APP_ROOT, DATA) if browser_mode == 'shared' else None
     atomic_json(DATA / 'supervisor-pids.json', {'pid': os.getpid(), 'started': stamp()})
     try:
         while True:

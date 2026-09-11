@@ -13,6 +13,7 @@ from .vision import OCR, UncertainScreen
 from .executor import ExecutionBlocked
 from .engine import PlanController, ScheduledEnd
 from .model import timestamp
+from ev_assistant.runtime import user_root, browser_options
 URL='https://eternal-void.online/'
 
 
@@ -36,7 +37,7 @@ async def click_control(page, pattern):
 
 async def run(profile_id):
     from playwright.async_api import async_playwright
-    root=Path(__file__).resolve().parent.parent
+    root=user_root()
     service=Service(root);profile=service.get(profile_id);account=profile['account'];visible=False
     path=service.path(profile);account_path=service.account_path(profile);claim=service.existing_claim(profile)
     lock=None;last={}
@@ -82,7 +83,7 @@ async def run(profile_id):
         status('starting','Opening the account and verifying login')
         ocr=OCR()
         async with async_playwright() as playwright:
-            browser=await playwright.chromium.launch_persistent_context(str(account_path/'browser-profile'),channel='chrome',headless=True,
+            browser=await playwright.chromium.launch_persistent_context(str(account_path/'browser-profile'),**browser_options(),headless=True,
                 viewport={'width':470,'height':912},device_scale_factor=1)
             try:
                 from ev_assistant.performance import install_frame_limit, enable_frame_limit

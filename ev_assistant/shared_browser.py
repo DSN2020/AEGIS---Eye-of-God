@@ -8,9 +8,9 @@ import subprocess
 import time
 
 from .credentials import crypt
+from .runtime import browser_options
 
 LOG = logging.getLogger(__name__)
-CHROME = r'C:\Program Files\Google\Chrome\Application\chrome.exe'
 
 
 class SharedBrowserHost:
@@ -36,10 +36,11 @@ class SharedBrowserHost:
             driver = Path(playwright.__file__).parent / 'driver'
             self.data.mkdir(parents=True, exist_ok=True)
             self.output = (self.data / 'shared-browser.log').open('a', encoding='utf-8')
+            options = browser_options()
             self.process = subprocess.Popen([
                 str(driver / ('node.exe' if os.name == 'nt' else 'node')),
                 str(self.root / 'shared_browser_host.cjs'), str(driver / 'package'),
-                str(self.state_path), CHROME], cwd=self.root, stdin=subprocess.PIPE,
+                str(self.state_path), options.get('channel', '')], cwd=self.root, stdin=subprocess.PIPE,
                 stdout=self.output, stderr=subprocess.STDOUT,
                 creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
             deadline = time.monotonic() + 20
@@ -99,7 +100,7 @@ class AccountBrowser:
         if self.session_path is None:
             self.context = await playwright.chromium.launch_persistent_context(
                 str(self.config.get('browser_profile', self.data / 'browser-profile')),
-                headless=headless, executable_path=CHROME,
+                headless=headless, **browser_options(),
                 viewport=self.config['viewport'], device_scale_factor=1)
         else:
             state = None

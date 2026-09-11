@@ -28,3 +28,7 @@ ui-error.txt
 .vs/
 *.user
 *.suo
+
+# Downloadable Windows builds and isolated packaging checks
+/.build/
+/dist/
