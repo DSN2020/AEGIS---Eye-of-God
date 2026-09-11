@@ -32,6 +32,7 @@ public partial class MainWindow : Window
     private readonly HashSet<string> savedNames = new(StringComparer.OrdinalIgnoreCase);
     private string[] savedAccountNames = Enumerable.Repeat("",MaxAgents).ToArray();
     private bool loadingSettings, accountEditsPending;
+    private NativeWindowFrame? nativeFrame;
     private List<PlayerEntry> allPlayers = [];
     private List<PlayerEntry> filteredPlayers = [];
     private List<WorkerEntry> workers = [];
@@ -46,6 +47,26 @@ public partial class MainWindow : Window
         InitializeComponent(); SetCoordinateView(false); BuildAccountRows(); ActivityList.ItemsSource=activityRows;
         highlightTimer.Tick+=(_,_)=>ExpireActivityHighlights(activityClock.Elapsed);
         highlightTimer.Start();
+        StateChanged+=(_,_)=>UpdateWindowShape();
+    }
+
+    private void Window_SourceInitialized(object? sender,EventArgs e) => nativeFrame=new NativeWindowFrame(this);
+    private void Shell_SizeChanged(object sender,SizeChangedEventArgs e) => UpdateWindowShape();
+    private void ToggleSidebar(object sender,RoutedEventArgs e)
+    {
+        bool visible=SidebarPanel.Visibility==Visibility.Visible;
+        SidebarPanel.Visibility=visible?Visibility.Collapsed:Visibility.Visible;
+        SidebarColumn.Width=new GridLength(visible?0:244);
+    }
+    private void UpdateWindowShape()
+    {
+        if(ShellContent==null) return;
+        bool maximized=WindowState==WindowState.Maximized;
+        ShellBorder.CornerRadius=new CornerRadius(maximized?0:9);
+        // WindowChrome keeps a resize frame outside the maximized work area.
+        ShellBorder.Padding=maximized ? SystemParameters.WindowResizeBorderThickness : new Thickness(0);
+        ShellContent.Clip=new RectangleGeometry(new Rect(0,0,ShellContent.ActualWidth,ShellContent.ActualHeight),maximized?0:8,maximized?0:8);
+        if(MaximizeButton!=null) MaximizeButton.Content=maximized?"❐":"□";
     }
 
     private static string S(JsonElement e,string key,string fallback="") => e.ValueKind==JsonValueKind.Object && e.TryGetProperty(key,out var v) && v.ValueKind!=JsonValueKind.Null ? v.ToString() : fallback;
@@ -57,6 +78,9 @@ public partial class MainWindow : Window
     private async void Window_Loaded(object sender,RoutedEventArgs e)
     {
         try {
+            if(Environment.GetCommandLineArgs().Contains("--preview-ui")) {
+                await CaptureDesignPreview(); Close(); return;
+            }
             var runtime=RuntimeSetup.Prepare(AppContext.BaseDirectory);
             root=runtime.DataRoot;
             var info=runtime.BridgeProcess();
@@ -77,7 +101,7 @@ public partial class MainWindow : Window
         } catch(Exception ex) {
             ShowMessage(ex.Message,true);
             ResumeButton.IsEnabled=PauseButton.IsEnabled=ApplyButton.IsEnabled=false;
-            if(verifyUi || smokeTest) {
+            if(verifyUi || smokeTest || Environment.GetCommandLineArgs().Contains("--preview-ui")) {
                 string output=Environment.GetEnvironmentVariable("EOG_TEST_OUTPUT") ?? AppContext.BaseDirectory;
                 Directory.CreateDirectory(output);
                 await File.WriteAllTextAsync(Path.Combine(output,"ui-error.txt"),ex.ToString());
@@ -262,6 +286,7 @@ public partial class MainWindow : Window
     private void Navigate(object sender,RoutedEventArgs e) => ShowPage((Button)sender);
     private void ShowPage(Button selected)
     {
+        WorkspaceTitle.Text=selected.Content?.ToString()??"EOG";
         LiveView.Visibility=selected==NavLive ? Visibility.Visible : Visibility.Collapsed;
         PlayersView.Visibility=selected==NavPlayers ? Visibility.Visible : Visibility.Collapsed;
         AccountsView.Visibility=selected==NavAccounts ? Visibility.Visible : Visibility.Collapsed;

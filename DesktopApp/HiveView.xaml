@@ -8,15 +8,15 @@
    </WrapPanel>
    <TextBlock Text="Largest clusters first. Each planet counts in one hive. Filters find hives with a matching member; every member stays visible." Style="{StaticResource MutedText}" TextWrapping="Wrap"/>
    <TextBlock Text="Based on recorded human-player coordinates. Areas still being scanned may contain more planets." Style="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,5,0,10"/>
-   <TextBlock x:Name="Summary" Foreground="#FF0034" Margin="0,0,0,10"/>
+   <TextBlock x:Name="Summary" Foreground="{StaticResource TextBrush}" Margin="0,0,0,10"/>
    <TextBlock x:Name="Feedback" Style="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,0,0,8"/>
   </StackPanel>
   <Grid>
    <ScrollViewer VerticalScrollBarVisibility="Auto"><ItemsControl x:Name="Cards"><ItemsControl.ItemTemplate><DataTemplate>
     <Border Style="{StaticResource Card}" Margin="0,0,0,12" Padding="16"><StackPanel>
-     <DockPanel><Button DockPanel.Dock="Right" Content="Copy hive" Tag="{Binding CopyText}" Click="CopyHive" Margin="12,0,0,0"/><TextBlock Text="{Binding Location}" FontSize="18" FontWeight="SemiBold" Foreground="#FF0034" VerticalAlignment="Center"/></DockPanel>
+     <DockPanel><Button DockPanel.Dock="Right" Content="Copy hive" Tag="{Binding CopyText}" Click="CopyHive" Margin="12,0,0,0"/><TextBlock Text="{Binding Location}" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}" VerticalAlignment="Center"/></DockPanel>
      <TextBlock Text="{Binding Summary}" Margin="0,8,0,5"/><TextBlock Text="{Binding SystemsText}" Style="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,0,0,12"/>
-     <ItemsControl ItemsSource="{Binding Members}"><ItemsControl.ItemTemplate><DataTemplate><Border Background="#111111" CornerRadius="6" Padding="10" Margin="0,0,0,6"><StackPanel>
+     <ItemsControl ItemsSource="{Binding Members}"><ItemsControl.ItemTemplate><DataTemplate><Border Background="{StaticResource InputBrush}" CornerRadius="6" Padding="10" Margin="0,0,0,6"><StackPanel>
       <TextBlock Text="{Binding Label}" TextWrapping="Wrap" FontWeight="SemiBold"/>
       <TextBox Text="{Binding CoordinatesText,Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" BorderThickness="0" Background="Transparent" FontFamily="Consolas" FontSize="12" Padding="0,7,0,0"/>
      </StackPanel></Border></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>

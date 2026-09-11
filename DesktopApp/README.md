@@ -1,6 +1,6 @@
 # EOG — Eye of God
 
-Windows desktop control panel for the Eternal Void scanner. Its WPF theme is adapted from the user's Anispo Control Panel: charcoal panels, red accents, rounded controls, and sidebar navigation.
+Windows desktop control panel for the Eternal Void scanner. Its WPF theme follows the user's Codex reference: charcoal panels, fine gray outlines, a subtle burgundy sidebar gradient, and an inset workspace with rounded controls. The title-bar button shows or hides navigation. Windows 11 supplies native rounded corners and a neutral dark frame; Windows 10 uses a rounded window region. Maximizing removes the outer rounding.
 
 For normal use, [download the Windows release](https://github.com/DSN2020/AEGIS---Eye-of-God/releases/latest), extract the whole ZIP and open its top-level `EOG.exe`. Everything needed to launch is included. The welcome screen guides account setup, and settings live in `%LOCALAPPDATA%\EOG`. The build instructions below apply to development from source.
 
@@ -16,5 +16,7 @@ The app bridge has no network listener; commands and responses use private proce
 Build: `dotnet publish EyeOfGod.csproj -c Release -o publish`
 
 UI verification: `publish/EOG.exe --verify-ui` exercises actual name/alliance filters and agent-count bounds, then writes rendered screenshots and `verification.json` in `ui-review/`. It does not modify credentials or start/stop the scanner. Scanner and bridge tests live in the root `tests/` directory.
+
+Visual review without accounts: set `EOG_TEST_OUTPUT` to an output directory and run `EOG.exe --preview-ui`. This mode renders synthetic data across all pages, the compact layout, collapsed sidebar, and maximized/restored window. It checks that Save & apply and the tenth account remain reachable and verifies supported native frame settings. It never connects to the bridge or game. Use `packaging/Test-WindowsPackage.ps1` for the separate fresh-install and real account-saving smoke checks.
 
 EOG supports ten account slots. The current scheduler assigns a whole galaxy to each scanning agent, so up to nine can scan concurrently; an additional configured agent waits for an available assignment. New slots are blank and require your own credentials. Adding accounts through Save & apply restarts the supervisor from checkpoints and loads the updated limit.
