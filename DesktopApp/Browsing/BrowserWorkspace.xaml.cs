@@ -55,8 +55,16 @@ public partial class BrowserWorkspace : UserControl, IDisposable
     public Task EnsureStartedAsync() => closed ? Task.CompletedTask : startup ??= StartAsync();
     private async Task StartAsync()
     {
-        var results = await Task.WhenAll(Panes.ToArray().Select(StartPaneAsync));
-        if (!closed && results.Any(ok => !ok)) StatusText.Text = "Some browsers could not start. Check their messages or restart them in options.";
+        bool failed = false;
+        // Stagger saved game pages instead of loading every game's assets and
+        // account connections in the same burst when opening a large workspace.
+        foreach (var pane in OrderedPanes().ToArray()) {
+            if (closed) return;
+            if (!Panes.Contains(pane)) continue;
+            failed |= !await StartPaneAsync(pane);
+            if (pane != OrderedPanes().LastOrDefault()) await Task.Delay(1200);
+        }
+        if (!closed && failed) StatusText.Text = "Some browsers could not start. Check their messages or restart them in options.";
     }
     private static async Task<bool> StartPaneAsync(BrowserPane pane)
     {

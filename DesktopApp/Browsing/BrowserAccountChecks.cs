@@ -38,7 +38,10 @@ internal static class BrowserAccountChecks
         string pages = Path.Combine(root, "login-fixture"); Directory.CreateDirectory(pages);
         await File.WriteAllTextAsync(Path.Combine(pages, "login.html"), """
             <!doctype html><meta name="viewport" content="width=device-width,initial-scale=1">
-            <form onsubmit="event.preventDefault();window.submitted=true"><input type="text"><input type="password"><button>LOG IN</button></form>
+            <style>input{display:block;width:240px;height:35px;margin:10px}.registration{position:absolute;left:540px;top:0}.invisible{position:absolute;top:300px;opacity:0}</style>
+            <form id="login" onsubmit="event.preventDefault();window.submitted=true"><input id="login-user" type="text"><input id="login-password" type="password"><button>LOG IN</button></form>
+            <div class="registration"><input type="email"><input type="password"><input type="password"></div>
+            <div class="invisible"><input type="text"><input type="password"></div>
             <script>window.changes=0;document.addEventListener('input',()=>window.changes++);</script>
             """);
         core.SetVirtualHostNameToFolderMapping("eternal-void.online", pages, CoreWebView2HostResourceAccessKind.DenyCors);
@@ -47,11 +50,18 @@ internal static class BrowserAccountChecks
             core.Navigate("https://eternal-void.online/login.html");
             for (int i = 0; i < 200; i++)
             {
-                if (await pane.Browser.ExecuteScriptAsync("location.href==='https://eternal-void.online/login.html' && document.querySelectorAll('input').length===2") == "true") break;
+                if (await pane.Browser.ExecuteScriptAsync("location.href==='https://eternal-void.online/login.html' && document.querySelectorAll('input').length===7") == "true") break;
                 await Task.Delay(100);
             }
-            check(await pane.FillLoginAsync(user, secret), "Saved login fills the recognized game login form");
+            check(await pane.FillLoginAsync(user, secret), "Saved login ignores the game's offscreen registration and transparent inputs");
             check(await pane.Browser.ExecuteScriptAsync("document.querySelector('input[type=text]').value==='Example account' && document.querySelector('input[type=password]').value.length===26 && window.changes===2 && !window.submitted") == "true", "Login filling updates form events without submitting credentials");
+            check(await pane.Browser.ExecuteScriptAsync("[...document.querySelectorAll('.registration input,.invisible input')].every(e=>e.value==='')") == "true", "Registration and invisible fields never receive login credentials");
+            await pane.Browser.ExecuteScriptAsync("document.body.insertAdjacentHTML('beforeend','<div id=cover style=\"position:fixed;inset:0;background:#222;z-index:100\"></div>')");
+            check(!await pane.FillLoginAsync("Should not fill", secret), "A connection overlay covering login prevents filling underneath it");
+            await pane.Browser.ExecuteScriptAsync("document.querySelector('#cover').remove();document.querySelector('#login').insertAdjacentHTML('beforeend','<input id=duplicate type=password>')");
+            check(!await pane.FillLoginAsync("Should not fill", secret), "Multiple visible password fields are rejected without changing the account");
+            await pane.Browser.ExecuteScriptAsync("document.querySelector('#duplicate').remove();document.querySelector('#login-user').type='email'");
+            check(await pane.FillLoginAsync("example@example.invalid", secret), "Email identifiers use the same visible login form");
             core.Navigate("about:blank");
             for (int i = 0; i < 100 && core.Source != "about:blank"; i++) await Task.Delay(50);
             check(!await pane.FillLoginAsync(user, secret), "Credentials are refused outside the exact HTTPS game origin");

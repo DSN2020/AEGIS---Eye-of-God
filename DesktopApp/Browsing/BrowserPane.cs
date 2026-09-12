@@ -50,6 +50,8 @@ public sealed partial class BrowserPane : Border, IDisposable
         layout.RowDefinitions.Add(new() { Height = GridLength.Auto });
         layout.RowDefinitions.Add(new() { Height = new(1, GridUnitType.Star) });
         layout.RowDefinitions.Add(statusRow);
+        layout.RowDefinitions.Add(new() { Height = GridLength.Auto });
+        BuildConnectionNotice(layout);
         var heading = new Grid { Margin = new(6, 3, 3, 3) };
         heading.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) }); heading.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
         title.FontWeight = FontWeights.SemiBold;
@@ -61,6 +63,7 @@ public sealed partial class BrowserPane : Border, IDisposable
         actions.Children.Add(Button("\uE713", "Assistant controls", (_, _) => AssistantRequested?.Invoke(this)));
         mute = Button("\uE767", "Mute browser", (_, _) => SetMuted(!State.Muted)); actions.Children.Add(mute);
         actions.Children.Add(Button("\uE774", "Show / hide address bar", (_, _) => { if (nav.Visibility == Visibility.Visible) nav.Visibility = Visibility.Collapsed; else FocusAddress(); }));
+        actions.Children.Add(Button("\uE72C", "Refresh this browser", (_, _) => { if (!AssistantControlled) Browser?.CoreWebView2?.Reload(); }));
         focus = Button("\uE740", "Maximize this pane", (_, _) => FocusRequested?.Invoke(this)); actions.Children.Add(focus);
         actions.Children.Add(Button("\uE712", "Browser options", OpenMenu)); layout.Children.Add(heading);
         var closeButton = new Button { Content = "−", Width = 24, MinHeight = 26, Padding = new(0), Background = Brushes.Transparent, BorderThickness = new(0), ToolTip = "Close this browser. Saved login is kept.", FontSize = 16 };
@@ -97,7 +100,7 @@ public sealed partial class BrowserPane : Border, IDisposable
             SetStatus("Preparing browser support · first setup may take a moment…");
             await BrowserRuntime.EnsureAvailableAsync();
             if (disposed) return;
-            Browser = new WebView2CompositionControl { Width = MobileViewportWidth, Height = MobileViewportHeight, DefaultBackgroundColor = System.Drawing.Color.FromArgb(13, 13, 13), CreationProperties = new CoreWebView2CreationProperties { UserDataFolder = DataFolder, ProfileName = "Default", IsInPrivateModeEnabled = State.Temporary, AdditionalBrowserArguments = $"--remote-debugging-address=127.0.0.1 --remote-debugging-port={DebugPort}" } };
+            Browser = new WebView2CompositionControl { Width = MobileViewportWidth, Height = MobileViewportHeight, DefaultBackgroundColor = System.Drawing.Color.FromArgb(13, 13, 13), CreationProperties = new CoreWebView2CreationProperties { UserDataFolder = DataFolder, ProfileName = "Default", IsInPrivateModeEnabled = State.Temporary, AdditionalBrowserArguments = $"--disable-quic --remote-debugging-address=127.0.0.1 --remote-debugging-port={DebugPort}" } };
             mobileScreen.Child = Browser;
             body.Children.Clear(); body.Children.Add(mobileScreen); body.Children.Add(dropCover);
             await Browser.EnsureCoreWebView2Async();
@@ -109,8 +112,8 @@ public sealed partial class BrowserPane : Border, IDisposable
             core.Settings.IsStatusBarEnabled = false;
             core.IsMuted = State.Muted; Browser.ZoomFactor = State.Zoom;
             core.IsMutedChanged += (_, _) => { if (core.IsMuted != State.Muted) SetMuted(core.IsMuted); };
-            core.NavigationStarting += (_, _) => { loading = true; ((TextBlock)reload.Content).Text = "\uE711"; SetStatus("Loading…"); };
-            core.NavigationCompleted += (_, e) => { loading = false; ((TextBlock)reload.Content).Text = "\uE72C"; SetStatus(e.IsSuccess ? SessionLabel : $"Page failed to load: {e.WebErrorStatus} · Try refresh"); };
+            core.NavigationStarting += (_, _) => { ClearConnectionFailure(); loading = true; reconnect.IsEnabled = false; ((TextBlock)reload.Content).Text = "\uE711"; SetStatus("Loading…"); };
+            core.NavigationCompleted += (_, e) => { loading = false; reconnect.IsEnabled = !AssistantControlled; ((TextBlock)reload.Content).Text = "\uE72C"; SetStatus(e.IsSuccess ? SessionLabel : $"Page failed to load: {e.WebErrorStatus} · Try refresh"); };
             core.HistoryChanged += (_, _) => { back.IsEnabled = !AssistantControlled && core.CanGoBack; forward.IsEnabled = !AssistantControlled && core.CanGoForward; };
             core.SourceChanged += (_, _) =>
             {
@@ -123,6 +126,8 @@ public sealed partial class BrowserPane : Border, IDisposable
             core.ProcessFailed += (_, _) => { SetStatus("Browser stopped. Use Restart browser in options."); };
             Browser.ZoomFactorChanged += (_, _) => { State.Zoom = Browser.ZoomFactor; StateChanged?.Invoke(); };
             back.IsEnabled = false; forward.IsEnabled = false;
+            await WatchConnectionsAsync(core);
+            if (disposed) return;
             if (navigate) { if (!State.Temporary && !string.IsNullOrWhiteSpace(State.Url)) Navigate(State.Url); else Home(); }
             SetStatus(SessionLabel);
         }

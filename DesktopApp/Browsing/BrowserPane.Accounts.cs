@@ -14,7 +14,19 @@ public sealed partial class BrowserPane
         string script = $$"""
             (() => {
               if (location.origin !== 'https://eternal-void.online') return false;
-              const visible = e => !e.disabled && !e.readOnly && e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden';
+              const visible = e => {
+                const r = e.getBoundingClientRect();
+                if (!e.isConnected || e.disabled || e.readOnly || r.width <= 0 || r.height <= 0
+                    || r.left < 0 || r.top < 0 || r.right > innerWidth || r.bottom > innerHeight) return false;
+                let opacity = 1;
+                for (let node = e; node; node = node.parentElement) {
+                  const style = getComputedStyle(node);
+                  opacity *= Number(style.opacity);
+                  if (style.display === 'none' || style.visibility !== 'visible') return false;
+                }
+                const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+                return opacity >= .5 && (top === e || e.contains(top));
+              };
               const inputs = [...document.querySelectorAll('input')].filter(visible);
               const passwords = inputs.filter(e => e.type === 'password');
               const users = inputs.filter(e => ['text','email'].includes(e.type));

@@ -145,6 +145,7 @@ internal static class BrowserChecks
             Check(restored.Index == 1 && (await ReadStorage(restored)).Cookie == "isolation=pane1", "Plus restores the recently closed profile and its login cookie", log);
             window.ClosePane(seventh);
             await BrowserAccountChecks.RunAsync(window, dataRoot, (ok, name) => Check(ok, name, log));
+            await BrowserConnectionChecks.RunAsync(window.Panes[0], dataRoot, (ok, name) => Check(ok, name, log));
             window.SetRows(2); window.FitToWindow(); window.UpdateLayout();
             foreach (var pane in window.Panes) pane.Home();
             foreach (var pane in window.Panes)
