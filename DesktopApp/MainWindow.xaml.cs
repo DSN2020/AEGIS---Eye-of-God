@@ -32,6 +32,7 @@ public partial class MainWindow : Window
     private readonly HashSet<string> savedNames = new(StringComparer.OrdinalIgnoreCase);
     private string[] savedAccountNames = Enumerable.Repeat("",MaxAgents).ToArray();
     private bool loadingSettings, accountEditsPending;
+    private NativeWindowFrame? nativeFrame;
     private List<PlayerEntry> allPlayers = [];
     private List<PlayerEntry> filteredPlayers = [];
     private List<WorkerEntry> workers = [];
@@ -46,6 +47,26 @@ public partial class MainWindow : Window
         InitializeComponent(); SetCoordinateView(false); BuildAccountRows(); ActivityList.ItemsSource=activityRows;
         highlightTimer.Tick+=(_,_)=>ExpireActivityHighlights(activityClock.Elapsed);
         highlightTimer.Start();
+        StateChanged+=(_,_)=>UpdateWindowShape();
+    }
+
+    private void Window_SourceInitialized(object? sender,EventArgs e) => nativeFrame=new NativeWindowFrame(this);
+    private void Shell_SizeChanged(object sender,SizeChangedEventArgs e) => UpdateWindowShape();
+    private void ToggleSidebar(object sender,RoutedEventArgs e)
+    {
+        bool visible=SidebarPanel.Visibility==Visibility.Visible;
+        SidebarPanel.Visibility=visible?Visibility.Collapsed:Visibility.Visible;
+        SidebarColumn.Width=new GridLength(visible?0:244);
+    }
+    private void UpdateWindowShape()
+    {
+        if(ShellContent==null) return;
+        bool maximized=WindowState==WindowState.Maximized;
+        ShellBorder.CornerRadius=new CornerRadius(maximized?0:9);
+        // WindowChrome keeps a resize frame outside the maximized work area.
+        ShellBorder.Padding=maximized ? SystemParameters.WindowResizeBorderThickness : new Thickness(0);
+        ShellContent.Clip=new RectangleGeometry(new Rect(0,0,ShellContent.ActualWidth,ShellContent.ActualHeight),maximized?0:8,maximized?0:8);
+        if(MaximizeButton!=null) MaximizeButton.Content=maximized?"❐":"□";
     }
 
     private static string S(JsonElement e,string key,string fallback="") => e.ValueKind==JsonValueKind.Object && e.TryGetProperty(key,out var v) && v.ValueKind!=JsonValueKind.Null ? v.ToString() : fallback;
@@ -57,6 +78,17 @@ public partial class MainWindow : Window
     private async void Window_Loaded(object sender,RoutedEventArgs e)
     {
         try {
+            if(Environment.GetCommandLineArgs().Contains("--verify-browsers")) {
+                if(Browsers.HasStarted) throw new InvalidOperationException("Browsers must start only when selected.");
+                ShowPage(NavBrowsers);
+                await Browsers.EnsureStartedAsync();
+                int result=await Browsing.BrowserChecks.RunAsync(Browsers,Browsers.DataRoot,selected=>ShowPage(selected?NavBrowsers:NavLive));
+                Application.Current.Shutdown(result); return;
+            }
+            if(Environment.GetCommandLineArgs().Contains("--browsers")) ShowPage(NavBrowsers);
+            if(Environment.GetCommandLineArgs().Contains("--preview-ui")) {
+                await CaptureDesignPreview(); Close(); return;
+            }
             var runtime=RuntimeSetup.Prepare(AppContext.BaseDirectory);
             root=runtime.DataRoot;
             var info=runtime.BridgeProcess();
@@ -73,11 +105,12 @@ public partial class MainWindow : Window
             }
             if(smokeTest) { await VerifyFreshInstall(); Close(); return; }
             if(verifyUi) { await VerifyAndCapture(); Close(); return; }
+            if(Environment.GetCommandLineArgs().Contains("--browsers")) ShowPage(NavBrowsers);
             timer.Tick+=async (_,_) => await RefreshSnapshot(); timer.Start();
         } catch(Exception ex) {
             ShowMessage(ex.Message,true);
             ResumeButton.IsEnabled=PauseButton.IsEnabled=ApplyButton.IsEnabled=false;
-            if(verifyUi || smokeTest) {
+            if(verifyUi || smokeTest || Environment.GetCommandLineArgs().Contains("--preview-ui") || Environment.GetCommandLineArgs().Contains("--verify-browsers")) {
                 string output=Environment.GetEnvironmentVariable("EOG_TEST_OUTPUT") ?? AppContext.BaseDirectory;
                 Directory.CreateDirectory(output);
                 await File.WriteAllTextAsync(Path.Combine(output,"ui-error.txt"),ex.ToString());
@@ -210,6 +243,7 @@ public partial class MainWindow : Window
         workerCount=N(settings,"workerCount",4);
         savedWorkerCount=workerCount;
         var accounts=settings.GetProperty("accounts").EnumerateArray().ToArray();
+        Browsers.UseScannerAccounts(Path.Combine(root,"data"),accounts.Select(a=>S(a,"username")));
         savedAccountNames=Enumerable.Range(0,MaxAgents).Select(i=>i<accounts.Length ? S(accounts[i],"username") : "").ToArray();
         savedNames.Clear(); foreach(var a in accounts) if(B(a,"hasPassword")) savedNames.Add(S(a,"username"));
         WelcomeCard.Visibility=savedNames.Count==0 ? Visibility.Visible : Visibility.Collapsed;
@@ -262,12 +296,15 @@ public partial class MainWindow : Window
     private void Navigate(object sender,RoutedEventArgs e) => ShowPage((Button)sender);
     private void ShowPage(Button selected)
     {
+        WorkspaceTitle.Text=selected.Content?.ToString()??"EOG";
         LiveView.Visibility=selected==NavLive ? Visibility.Visible : Visibility.Collapsed;
         PlayersView.Visibility=selected==NavPlayers ? Visibility.Visible : Visibility.Collapsed;
         AccountsView.Visibility=selected==NavAccounts ? Visibility.Visible : Visibility.Collapsed;
         ActivityView.Visibility=selected==NavActivity ? Visibility.Visible : Visibility.Collapsed;
+        Browsers.Visibility=selected==NavBrowsers ? Visibility.Visible : Visibility.Collapsed;
+        if(selected==NavBrowsers) _=Browsers.EnsureStartedAsync();
         Automation.Visibility=selected==NavAutomation ? Visibility.Visible : Visibility.Collapsed;
-        foreach(var button in new[]{NavLive,NavPlayers,NavAccounts,NavActivity,NavAutomation}) button.Style=(Style)FindResource(button==selected ? "NavButtonActive" : "NavButton");
+        foreach(var button in new[]{NavLive,NavBrowsers,NavPlayers,NavAccounts,NavActivity,NavAutomation}) button.Style=(Style)FindResource(button==selected ? "NavButtonActive" : "NavButton");
     }
     private void FilterChanged(object s,TextChangedEventArgs e) { if(PlayerCards!=null) ApplyFilters(); }
     private void ApplyFilters()
@@ -321,7 +358,7 @@ public partial class MainWindow : Window
     private void Minimize(object s,RoutedEventArgs e) => WindowState=WindowState.Minimized;
     private void Maximize(object s,RoutedEventArgs e) => WindowState=WindowState==WindowState.Maximized?WindowState.Normal:WindowState.Maximized;
     private void CloseApp(object s,RoutedEventArgs e) => Close();
-    private void Window_Closed(object? s,EventArgs e) { closed=true;timer.Stop();highlightTimer.Stop();try {bridge?.StandardInput.Close();}catch{} }
+    private void Window_Closed(object? s,EventArgs e) { closed=true;timer.Stop();highlightTimer.Stop();Browsers.Dispose();try {bridge?.StandardInput.Close();}catch{} }
 
     private async Task VerifyAndCapture()
     {

@@ -27,7 +27,7 @@ public sealed class AutomationView : UserControl
     {
         var grid=new Grid();grid.ColumnDefinitions.Add(new(){Width=new GridLength(235)});grid.ColumnDefinitions.Add(new(){Width=new GridLength(1,GridUnitType.Star)});Content=grid;
         var left=new DockPanel { Margin=new Thickness(0,0,18,0) };grid.Children.Add(left);
-        var title=Text("Upgrade profiles",22,"BrandBrush");DockPanel.SetDock(title,Dock.Top);left.Children.Add(title);
+        var title=Text("Upgrade profiles",18,"TextBrush");DockPanel.SetDock(title,Dock.Top);left.Children.Add(title);
         var create=Button("+ New profile",(_,_)=>New());DockPanel.SetDock(create,Dock.Top);left.Children.Add(create);
         var presetPanel=new StackPanel { Margin=new Thickness(0,15,0,0) };DockPanel.SetDock(presetPanel,Dock.Bottom);left.Children.Add(presetPanel);
         presetPanel.Children.Add(Text("SAVED PRESETS",11));presetPanel.Children.Add(presets);presetPanel.Children.Add(Button("Load into profile",(_,_)=>LoadPreset()));
@@ -35,7 +35,7 @@ public sealed class AutomationView : UserControl
         StyleList(profiles);left.Children.Add(profiles);profiles.SelectionChanged+=(_,_)=> {if(!filling && profiles.SelectedIndex>=0)Load(entries[profiles.SelectedIndex]["profile"]!.DeepClone());};
         var right=new DockPanel();Grid.SetColumn(right,1);grid.Children.Add(right);
         var header=new StackPanel();DockPanel.SetDock(header,Dock.Top);right.Children.Add(header);
-        header.Children.Add(Text("Account automation",26,"BrandBrush"));header.Children.Add(Text("Saved plans, scheduled checks and local watch alerts. Profiles start paused.",12));
+        header.Children.Add(Text("Account automation",23,"TextBrush"));header.Children.Add(Text("Saved plans, scheduled checks and local watch alerts. Profiles start paused.",12));
         var actions=new WrapPanel {Margin=new Thickness(0,12,0,0)};header.Children.Add(actions);
         SetupButton(save,"Save profile",async(_,_)=>await Do(Save));SetupButton(run,"▶ Start",async(_,_)=>await Do(async()=>{await Save();var r=await Send(new {command="automation_start",id});message.Text=r["message"]!.ToString();await Poll();}));
         SetupButton(pause,"Ⅱ Pause",async(_,_)=>await Do(async()=>{var r=await Send(new {command="automation_pause",id});message.Text=r["message"]!.ToString();await Poll();}));

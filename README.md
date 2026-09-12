@@ -19,11 +19,14 @@ The download includes Python, .NET, Chromium and OCR. No developer tools, comman
 
 Settings and results are stored separately in `%LOCALAPPDATA%\EOG`. To update, pause scans and any Upgrade bot profiles, close EOG, and extract the new download into a new folder. Your accounts and progress remain available. Source installations keep their original local data and are not automatically migrated. Closing EOG leaves scans running; use **Pause scan** to stop them.
 
+The Browsers workspace stores its saved sessions separately in `%LOCALAPPDATA%\AnispoBrowser`, preserving earlier browser workspaces. On PCs missing Microsoft WebView2, opening Browsers installs Microsoft’s bundled browser-support installer with an internet connection. Browser panes stay under manual control; scanner automation uses separate sessions.
+
 Current downloads are unsigned, so Windows may show an unknown-publisher warning. See the release notes for the checks performed for that build.
 
 ## Features
 
 - WPF app with live worker status, game previews, and account management.
+- Interactive Browsers workspace with isolated saved sessions, account assignment, navigation, layouts, zoom and mute; available independently of scanning.
 - Python + Playwright with separate browser profiles and an optional shared-Chrome mode.
 - RapidOCR reads the canvas. Every unverified slot is opened and checked before recording ownership.
 - Resumable coverage of nine galaxies and 499 systems each. The default sweep checks positions 5–20 (16 per system), skipping NPC positions 1–4 and nebula position 21. Unresolved required positions remain queued for retry.

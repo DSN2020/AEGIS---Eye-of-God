@@ -24,3 +24,9 @@ extracted program folder. Your saved data remains in %LOCALAPPDATA%\EOG.
 
 Download updates and report problems:
 https://github.com/DSN2020/AEGIS---Eye-of-God/releases
+
+Browsers opens your interactive saved workspace without starting a scan.
+Browser sessions are saved in %LOCALAPPDATA%\AnispoBrowser. If Microsoft
+WebView2 is missing, first browser use installs it using the bundled Microsoft
+installer and an internet connection. Assistant control inside these panes is
+not available in this build; scanner sessions run separately.

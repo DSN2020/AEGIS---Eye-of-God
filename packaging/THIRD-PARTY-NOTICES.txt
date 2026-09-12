@@ -19,3 +19,7 @@ Visual Studio redistributable code terms. These are the Microsoft-supplied
 files from the build toolchain's x64 Microsoft.VC*.CRT directory.
 
 Retain these license files when redistributing this package.
+
+Microsoft WebView2 SDK and Evergreen Runtime bootstrapper: Microsoft software
+license terms. The signed bootstrapper is runtime/MicrosoftEdgeWebview2Setup.exe.
+https://developer.microsoft.com/microsoft-edge/webview2/
